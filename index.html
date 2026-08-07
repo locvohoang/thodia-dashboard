@@ -182,7 +182,7 @@
 </style>
 </head>
 <body>
-<div style="background:#FEF3DC;color:#B8790A;padding:8px 16px;font-size:13px;font-weight:600;text-align:center;">📸 SNAPSHOT TĨNH (GitHub Pages) — chốt số lúc 04/08/2026, KHÔNG tự động cập nhật. Toàn bộ dữ liệu (Meta/TikTok/BigQuery/Sheets) đã đóng băng thành hằng số tĩnh do GitHub Pages không hỗ trợ gọi API live. Muốn số mới nhất, dùng bản Cowork artifact (live) hoặc nhờ refresh lại bản này.</div>
+<div style="background:#FEF3DC;color:#B8790A;padding:8px 16px;font-size:13px;font-weight:600;text-align:center;">📸 SNAPSHOT TĨNH (GitHub Pages) — chốt số lúc 07/08/2026, KHÔNG tự động cập nhật. Toàn bộ dữ liệu (Meta/TikTok/BigQuery/Sheets) đã đóng băng thành hằng số tĩnh do GitHub Pages không hỗ trợ gọi API live. Muốn số mới nhất, dùng bản Cowork artifact (live) hoặc nhờ refresh lại bản này.</div>
 <div class="wrap">
 
   <div class="hero">
@@ -422,9 +422,11 @@
       <div class="highlight-grid cols-2" id="dauHeadline" style="grid-template-columns: repeat(4, 1fr); max-width:900px;"></div>
       <div class="status-line" id="appInstallStatus"></div>
 
-      <div class="subhead">DAU / DWL theo ngày</div>
+      <div class="subhead">DAU / DWL theo campaign quảng cáo trả phí (14 ngày gần nhất)</div>
+      <div class="status-line" style="margin-bottom:6px;">Chỉ tính effort quảng cáo đổ về các trang mua bán Q12 (Google Pmax/Search + Meta) — không phải toàn bộ ngành hàng PTY.</div>
       <div class="chart-box tall"><canvas id="trendChart"></canvas></div>
       <div class="status-line" id="trendStatus"></div>
+      <div id="trendCostTable" style="margin-top:8px;"></div>
       <div class="status-line" id="campaignDauMauNote" style="font-style:italic;"></div>
 
       <div class="subhead">DAU / DWL theo Channel Grouping — theo ngày</div>
@@ -618,13 +620,13 @@ const BUDGET_PLAN = [
   { name: 'OOH (Sep–Dec)', plan: 900000000, actualKey: null, actual: 864000000, source: 'Manual', includeInTotal: true },
   { name: 'Collect locality data (Onboard thổ địa + CTV review)', plan: 150000000, actualKey: null, actual: 138150000, source: 'Manual', includeInTotal: true },
   { name: 'Media — Facebook ads', plan: 150000000, actualKey: 'meta', source: 'Live (Meta Ads)', includeInTotal: true },
-  { name: 'Media — Tiktok ads', plan: 50000000, actualKey: 'tiktok', source: 'Live (Supermetrics)', includeInTotal: true },
+  { name: 'Media — Tiktok ads', plan: 50000000, actualKey: 'tiktok', source: 'Snapshot (Google Sheet)', includeInTotal: true },
   { name: 'Media — Booking (Group/Tiktoker/Youtube)', plan: 200000000, actualKey: null, actual: 141600000, source: 'Manual', includeInTotal: true },
   { name: 'Media — Threads', plan: 50000000, actualKey: null, actual: 20000000, source: 'Manual', includeInTotal: true },
   { name: 'Media — Adtima', plan: 50000000, actualKey: null, actual: 27160000, source: 'Manual', includeInTotal: true },
   { name: 'Media — Google Maps review + Seeding comment', plan: 50000000, actualKey: null, actual: 1850000, source: 'Manual', includeInTotal: true },
   { name: 'App install', plan: 205458828, actualKey: null, actual: 51428200, source: 'Manual (blocked: Airbridge/Branch)', includeInTotal: false },
-  { name: 'DWL', plan: 346500000, actualKey: null, actual: null, source: 'Manual', includeInTotal: false },
+  { name: 'DWL (Digital performance)', plan: 346500000, actualKey: null, actual: 3690124, source: 'Manual (sheet Est Budget, ô H25)', includeInTotal: false },
 ];
 
 const OOH_PLAN = { L1: 9, L2: 11, L3: 35 };
@@ -695,14 +697,10 @@ function slugMatchesLabel(slug, label) {
   return p.frag ? (slug||'').includes(p.frag) : !(slug||'').includes('phuong-');
 }
 
+// FIX 2026-08-07 (theo Lox): chốt cứng actual OOH, không cho sửa qua UI nữa.
 function loadOOHActual() {
-  try {
-    const saved = JSON.parse(localStorage.getItem('thodia_ooh_actual') || 'null');
-    if (saved) return saved;
-  } catch (e) {}
-  return { L1: 0, L2: 2, L3: 0 };
+  return { L1: 5, L2: 11, L3: 75 };
 }
-function saveOOHActual(v) { localStorage.setItem('thodia_ooh_actual', JSON.stringify(v)); }
 
 function fmt(n) { if (n === null || n === undefined || isNaN(n)) return '—'; return Math.round(n).toLocaleString('vi-VN'); }
 function fmt2(n) { if (n === null || n === undefined || isNaN(n)) return '—'; return n.toLocaleString('vi-VN', { maximumFractionDigits: 2 }); }
@@ -799,16 +797,16 @@ const META_NAME_FILTERS = ['thodiacamp', 'brand_eng_sale_pty_b2c_0726'];
 // ---------- SNAPSHOT TĨNH (chốt số 2026-08-04) ----------
 // BigQuery bridge trên BuilderOS đang lỗi (sa_not_provisioned) và Meta/TikTok/Google Sheets KHÔNG có cầu nối
 // live trên nền tảng này -- toàn bộ dữ liệu bên dưới được fetch MỘT LẦN từ các nguồn thật (Meta Ads API,
-// BigQuery chotot-dwh, Google Sheet) lúc 04/08/2026 rồi đóng băng thành hằng số tĩnh. KHÔNG tự bịa số.
-const SNAPSHOT_FROZEN_AT = '04/08/2026 (giờ VN)';
+// BigQuery chotot-dwh, Google Sheet) lúc 07/08/2026 rồi đóng băng thành hằng số tĩnh. KHÔNG tự bịa số.
+const SNAPSHOT_FROZEN_AT = '07/08/2026 (giờ VN)';
 
-// fetchMeta(null) -- 8 campaign, gộp cả 2 filter META_NAME_FILTERS, y hệt logic gốc (dedupe theo id).
+// fetchMeta(null) -- 8 campaign, gộp cả 2 filter META_NAME_FILTERS, y hệt logic gốc (dedupe theo id). Refresh 07/08/2026.
 const META_STATIC_NOINC = [
-  { id: '120251856361570319', name: 'brand_reach_sale_pty_thodiacamp_only_fanengaged_b2c_hcm_0726_0826', objective: 'OUTCOME_AWARENESS', status: 'ACTIVE', reach: '438886', impressions: '524417', frequency: '1.194882', amount_spent: 'SGD152.77' },
-  { id: '120251446998690319', name: 'brand_eng_sale_pty_thodiacamp_b2c_exclude_quan12_0726_0826', objective: 'OUTCOME_ENGAGEMENT', status: 'ACTIVE', reach: '523247', impressions: '868587', frequency: '1.659994', amount_spent: 'SGD975.63' },
-  { id: '120251328719970319', name: 'brand_eng_sale_pty_thodiacamp_KV_b2c_0726_0826', objective: 'OUTCOME_ENGAGEMENT', status: 'ACTIVE', reach: '85692', impressions: '214760', frequency: '2.506185', amount_spent: 'SGD267.19' },
-  { id: '120251321695200319', name: 'brand_reach_pty_thodiacamp_b2c_0726_0826', objective: 'OUTCOME_AWARENESS', status: 'ACTIVE', reach: '918671', impressions: '4224513', frequency: '4.598505', amount_spent: 'SGD2,238.37' },
-  { id: '120251297310390319', name: 'brand_eng_sale_pty_thodiacamp_b2c_quan12_0726_0826', objective: 'OUTCOME_ENGAGEMENT', status: 'ACTIVE', reach: '321878', impressions: '773946', frequency: '2.40447', amount_spent: 'SGD923.68' },
+  { id: '120251856361570319', name: 'brand_reach_sale_pty_thodiacamp_only_fanengaged_b2c_hcm_0726_0826', objective: 'OUTCOME_AWARENESS', status: 'ACTIVE', reach: '654614', impressions: '1087083', frequency: '1.660647', amount_spent: 'SGD320.52' },
+  { id: '120251446998690319', name: 'brand_eng_sale_pty_thodiacamp_b2c_exclude_quan12_0726_0826', objective: 'OUTCOME_ENGAGEMENT', status: 'ACTIVE', reach: '625176', impressions: '1027875', frequency: '1.644137', amount_spent: 'SGD1,090.44' },
+  { id: '120251328719970319', name: 'brand_eng_sale_pty_thodiacamp_KV_b2c_0726_0826', objective: 'OUTCOME_ENGAGEMENT', status: 'ACTIVE', reach: '90216', impressions: '233115', frequency: '2.583965', amount_spent: 'SGD289.66' },
+  { id: '120251321695200319', name: 'brand_reach_pty_thodiacamp_b2c_0726_0826', objective: 'OUTCOME_AWARENESS', status: 'ACTIVE', reach: '944936', impressions: '4721248', frequency: '4.996368', amount_spent: 'SGD2,501.49' },
+  { id: '120251297310390319', name: 'brand_eng_sale_pty_thodiacamp_b2c_quan12_0726_0826', objective: 'OUTCOME_ENGAGEMENT', status: 'ACTIVE', reach: '340188', impressions: '809111', frequency: '2.378423', amount_spent: 'SGD958.03' },
   { id: '120251448019740319', name: 'brand_reach_sale_pty_thodiacamp_exclude_fanengaged_b2c_hcm_0726_0826', objective: 'OUTCOME_AWARENESS', status: 'PAUSED', reach: '1167533', impressions: '2576427', frequency: '2.206727', amount_spent: 'SGD857.06' },
   { id: '120251321467150319', name: 'brand_eng_pty_thodiacamp_b2b_0726_0826', objective: 'OUTCOME_ENGAGEMENT', status: 'ACTIVE', reach: '70136', impressions: '135499', frequency: '1.931947', amount_spent: 'SGD2.90' },
   { id: '120250905291160319', name: 'brand_eng_sale_pty_b2c_0726', objective: 'OUTCOME_ENGAGEMENT', status: 'ACTIVE', reach: '685021', impressions: '1315004', frequency: '1.919655', amount_spent: 'SGD15.00' },
@@ -838,12 +836,12 @@ const META_STATIC_DAILY_TOTALS = [
   { date_start: '2026-07-18', impressions: 281824, reach: 212324 },
   { date_start: '2026-07-19', impressions: 300589, reach: 224702 },
   { date_start: '2026-07-20', impressions: 364139, reach: 297186 },
-  { date_start: '2026-07-21', impressions: 324799, reach: 272875 },
-  { date_start: '2026-07-22', impressions: 248803, reach: 206984 },
-  { date_start: '2026-07-23', impressions: 299488, reach: 229596 },
-  { date_start: '2026-07-24', impressions: 311011, reach: 242542 },
-  { date_start: '2026-07-25', impressions: 346688, reach: 265498 },
-  { date_start: '2026-07-26', impressions: 322084, reach: 242939 },
+  { date_start: '2026-07-21', impressions: 456806, reach: 399830 },
+  { date_start: '2026-07-22', impressions: 404660, reach: 356452 },
+  { date_start: '2026-07-23', impressions: 414245, reach: 339533 },
+  { date_start: '2026-07-24', impressions: 426743, reach: 354282 },
+  { date_start: '2026-07-25', impressions: 456495, reach: 373239 },
+  { date_start: '2026-07-26', impressions: 454952, reach: 372960 },
   { date_start: '2026-07-27', impressions: 626581, reach: 549037 },
   { date_start: '2026-07-28', impressions: 550859, reach: 478719 },
   { date_start: '2026-07-29', impressions: 594442, reach: 524891 },
@@ -852,7 +850,10 @@ const META_STATIC_DAILY_TOTALS = [
   { date_start: '2026-08-01', impressions: 530754, reach: 446567 },
   { date_start: '2026-08-02', impressions: 688837, reach: 607507 },
   { date_start: '2026-08-03', impressions: 616738, reach: 548789 },
-  { date_start: '2026-08-04', impressions: 589648, reach: 509050 },
+  { date_start: '2026-08-04', impressions: 590213, reach: 509087 },
+  { date_start: '2026-08-05', impressions: 627216, reach: 548729 },
+  { date_start: '2026-08-06', impressions: 485290, reach: 413256 },
+  { date_start: '2026-08-07', impressions: 161653, reach: 141113 },
 ];
 async function fetchMeta(timeIncrement) {
   // SNAPSHOT: trước đây gọi callTool('...ads_get_ad_entities') tới Meta Ads API -- BuilderOS không có cầu nối
@@ -930,7 +931,7 @@ function parseTiktokDailyRows(text) {
 }
 
 let tiktokRawRowsCache = [];
-// SNAPSHOT: raw markdown fetch 1 lần lúc chốt (04/08/2026, xem SNAPSHOT_FROZEN_AT ở nchunk4) từ đúng
+// SNAPSHOT: raw markdown fetch 1 lần lúc chốt (07/08/2026, xem SNAPSHOT_FROZEN_AT ở nchunk4) từ đúng
 // TIKTOK_SHEET_ID -- giữ nguyên parseTiktokDailyRows() để parse y hệt logic gốc, chỉ tĩnh hoá bước fetch.
 const TIKTOK_STATIC_TEXT = `
 
@@ -981,8 +982,10 @@ const TIKTOK_STATIC_TEXT = `
 | 2026-08-03 0:00:00 | brand_reach_pty_thodiacamp_0726 | 0 | 0 | 0 | 0 |
 | 2026-08-03 0:00:00 | brand_videoviews_pty_thodiacamp_0726_0826. | 0 | 0 | 0 | 0 |
 | 2026-08-04 0:00:00 | brand_reach_pty_thodiacamp_0726 | 0 | 0 | 0 | 0 |
+| 2026-08-05 0:00:00 | brand_reach_pty_thodiacamp_0726 | 0 | 0 | 0 | 0 |
+| 2026-08-06 0:00:00 | brand_reach_pty_thodiacamp_0726 | 0 | 0 | 0 | 0 |
 |  |  |  |  |  |  |
-| Last synced: 06:49:35 5/8/2026 |  |  |  |  |  |`;
+| Last synced: 06:49:35 7/8/2026 |  |  |  |  |  |`;
 async function fetchTiktok() {
   // SNAPSHOT: trước đây gọi callTool('...read_file_content') tới Google Drive -- BuilderOS không có cầu nối
   // live cho Google Sheets nên đổi sang parse thẳng text tĩnh đã fetch sẵn ở trên (parser gốc giữ nguyên).
@@ -1126,13 +1129,13 @@ function renderKPIGrid(data) {
   const actualTotal = (Number(oohActual.L1)||0) + (Number(oohActual.L2)||0) + (Number(oohActual.L3)||0);
   const pOOH = pct(actualTotal, planTotal);
   oohCard.innerHTML = `
-    <div class="label">No. of OOH <span class="badge editable">EDITABLE</span></div>
+    <div class="label">No. of OOH <span class="badge dummy">MANUAL (FIXED)</span></div>
     <div class="value">${actualTotal} <span style="font-size:13px;color:var(--ink-soft);font-weight:600;">/ ${planTotal}</span></div>
     <div class="progress-track"><div class="progress-fill ${pctClass(pOOH)}" style="width:${Math.min(pOOH,100)}%"></div></div>
     <span class="pct-tag">${fmt2(pOOH)}% target</span>
-    <div class="ooh-row"><span>L1 (plan ${OOH_PLAN.L1})</span><input type="number" min="0" id="oohL1" value="${oohActual.L1}"></div>
-    <div class="ooh-row"><span>L2 (plan ${OOH_PLAN.L2})</span><input type="number" min="0" id="oohL2" value="${oohActual.L2}"></div>
-    <div class="ooh-row"><span>L3 (plan ${OOH_PLAN.L3})</span><input type="number" min="0" id="oohL3" value="${oohActual.L3}"></div>
+    <div class="ooh-row"><span>L1 (plan ${OOH_PLAN.L1})</span><span>${oohActual.L1}</span></div>
+    <div class="ooh-row"><span>L2 (plan ${OOH_PLAN.L2})</span><span>${oohActual.L2}</span></div>
+    <div class="ooh-row"><span>L3 (plan ${OOH_PLAN.L3})</span><span>${oohActual.L3}</span></div>
     ${trackHtml(WEEKLY_OOH_TARGET, actualTotal, 'slot')}
   `;
   grid.appendChild(oohCard);
@@ -1345,60 +1348,60 @@ let utmRawRows = [];
 const trafficDateRange = { from: '2026-07-01', to: '2026-08-31' };
 const dauDateRange = { from: '2026-07-01', to: '2026-08-31' };
 
-// ==== SNAPSHOT TĨNH (chốt 04/08/2026) ====
+// ==== SNAPSHOT TĨNH (chốt 07/08/2026) ====
 // UTM breakdown: toàn bộ traffic Q12 có RẤT nhiều tổ hợp campaign/source/medium/content/page (không giới
 // hạn theo Thổ Địa) — giới hạn top 50 theo visits để đóng băng gọn, đủ dùng cho bảng search/sort.
 const SNAPSHOT_UTM_ROWS = [
-  {campaign:"digital_dau_pty_sell_land_hcm_pmax_adview_2025",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-dat-quan-12-tp-ho-chi-minh",visits:21914,users:21041},
-  {campaign:"(none)",source:"(direct)",medium:"(none)",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh",visits:7513,users:4347},
-  {campaign:"(none)",source:"(direct)",medium:"(none)",content:null,page_slug:"mua-ban-dat-quan-12-tp-ho-chi-minh",visits:7429,users:1339},
-  {campaign:"digital_dau_pty_sell_houses_q12_pmax_lead_2026",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh",visits:1599,users:1388},
-  {campaign:"digital_dau_pty_sell_houses_hcm_pmax_lead_2026",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh",visits:1480,users:1391},
-  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh",visits:1472,users:739},
-  {campaign:"(none)",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh",visits:977,users:775},
-  {campaign:"(none)",source:"(direct)",medium:"(none)",content:null,page_slug:"mua-ban-can-ho-chung-cu-quan-12-tp-ho-chi-minh",visits:735,users:336},
-  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-can-ho-chung-cu-quan-12-tp-ho-chi-minh",visits:452,users:191},
-  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-dat-quan-12-tp-ho-chi-minh",visits:433,users:258},
-  {campaign:"digital_dau_pty_sell_houses_hcm_dsa_lead_2025",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh",visits:429,users:253},
-  {campaign:"(none)",source:"(direct)",medium:"(none)",content:null,page_slug:"mua-ban-nha-dat-phuong-thanh-xuan-quan-12-tp-ho-chi-minh",visits:320,users:315},
-  {campaign:"digital_dau_pty_sell_vn_pmax_adview_2026",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh",visits:319,users:240},
-  {campaign:"(none)",source:"(direct)",medium:"(none)",content:null,page_slug:"mua-ban-nha-dat-phuong-thanh-loc-quan-12-tp-ho-chi-minh",visits:309,users:306},
-  {campaign:"zalo",source:"zalo",medium:"zalo",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh",visits:293,users:177},
-  {campaign:"(none)",source:"(direct)",medium:"(none)",content:null,page_slug:"mua-ban-bat-dong-san-quan-12-tp-ho-chi-minh",visits:202,users:100},
-  {campaign:"tho_dia_camp",source:"adtima",medium:"social",content:"media_block_znews",page_slug:"mua-ban-bat-dong-san-quan-12-tp-ho-chi-minh",visits:170,users:134},
-  {campaign:"digital_dau_pty_sell_vn_pmax_adview_2026",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-can-ho-chung-cu-quan-12-tp-ho-chi-minh",visits:154,users:98},
-  {campaign:"Share_ad_via_iOS",source:"ad_view",medium:"share_buttons",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh",visits:152,users:75},
-  {campaign:"digital_dau_pty_sell_houses_hcm_dsa_lead_2025",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh-gia-duoi-1-ty-sdpr1",visits:152,users:93},
-  {campaign:"tho_dia_camp",source:"banner",medium:"floatingbutton",content:null,page_slug:"mua-ban-bat-dong-san-quan-12-tp-ho-chi-minh",visits:148,users:97},
+  {campaign:"digital_dau_pty_sell_land_hcm_pmax_adview_2025",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-dat-quan-12-tp-ho-chi-minh",visits:21917,users:21044},
+  {campaign:"(none)",source:"(direct)",medium:"(none)",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh",visits:7703,users:4428},
+  {campaign:"(none)",source:"(direct)",medium:"(none)",content:null,page_slug:"mua-ban-dat-quan-12-tp-ho-chi-minh",visits:7451,users:1352},
+  {campaign:"digital_dau_pty_sell_houses_q12_pmax_lead_2026",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh",visits:1681,users:1457},
+  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh",visits:1510,users:758},
+  {campaign:"digital_dau_pty_sell_houses_hcm_pmax_lead_2026",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh",visits:1483,users:1394},
+  {campaign:"(none)",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh",visits:1042,users:822},
+  {campaign:"(none)",source:"(direct)",medium:"(none)",content:null,page_slug:"mua-ban-can-ho-chung-cu-quan-12-tp-ho-chi-minh",visits:755,users:343},
+  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-can-ho-chung-cu-quan-12-tp-ho-chi-minh",visits:473,users:204},
+  {campaign:"digital_dau_pty_sell_houses_hcm_dsa_lead_2025",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh",visits:447,users:260},
+  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-dat-quan-12-tp-ho-chi-minh",visits:443,users:262},
+  {campaign:"(none)",source:"(direct)",medium:"(none)",content:null,page_slug:"mua-ban-nha-dat-phuong-thanh-xuan-quan-12-tp-ho-chi-minh",visits:346,users:341},
+  {campaign:"digital_dau_pty_sell_vn_pmax_adview_2026",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh",visits:340,users:256},
+  {campaign:"(none)",source:"(direct)",medium:"(none)",content:null,page_slug:"mua-ban-nha-dat-phuong-thanh-loc-quan-12-tp-ho-chi-minh",visits:331,users:328},
+  {campaign:"zalo",source:"zalo",medium:"zalo",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh",visits:308,users:184},
+  {campaign:"(none)",source:"(direct)",medium:"(none)",content:null,page_slug:"mua-ban-bat-dong-san-quan-12-tp-ho-chi-minh",visits:211,users:105},
+  {campaign:"tho_dia_camp",source:"adtima",medium:"social",content:"media_block_znews",page_slug:"mua-ban-bat-dong-san-quan-12-tp-ho-chi-minh",visits:178,users:139},
+  {campaign:"digital_dau_pty_sell_vn_pmax_adview_2026",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-can-ho-chung-cu-quan-12-tp-ho-chi-minh",visits:157,users:100},
+  {campaign:"tho_dia_camp",source:"banner",medium:"floatingbutton",content:null,page_slug:"mua-ban-bat-dong-san-quan-12-tp-ho-chi-minh",visits:156,users:105},
+  {campaign:"digital_dau_pty_sell_houses_hcm_dsa_lead_2025",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh-gia-duoi-1-ty-sdpr1",visits:155,users:94},
+  {campaign:"Share_ad_via_iOS",source:"ad_view",medium:"share_buttons",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh",visits:153,users:76},
   {campaign:"digital_dau_pty_sell_land_hcm_pmax_lead_2026",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-dat-quan-12-tp-ho-chi-minh",visits:139,users:125},
-  {campaign:"digital_dau_pty_sell_vn_pmax_adview_2026",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-dat-quan-12-tp-ho-chi-minh",visits:134,users:86},
+  {campaign:"digital_dau_pty_sell_vn_pmax_adview_2026",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-dat-quan-12-tp-ho-chi-minh",visits:136,users:87},
+  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh-gia-duoi-1-ty-sdpr1",visits:108,users:50},
   {campaign:"digital_dau_pty_sell_houses_hcm_dsa_lead_2025",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh-gia-tu-1-ty-den-2-ty-sdpr2",visits:106,users:75},
-  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh-gia-duoi-1-ty-sdpr1",visits:105,users:49},
   {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-bat-dong-san-quan-12-tp-ho-chi-minh",visits:100,users:59},
-  {campaign:"digital_dau_pty_sell_apartment_hcm_dsa_lead_2025",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-can-ho-chung-cu-quan-12-tp-ho-chi-minh",visits:97,users:67},
-  {campaign:"digital_dau_pty_sell_houses_hcm_dsa_lead_2025",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-phuong-an-phu-dong-quan-12-tp-ho-chi-minh",visits:87,users:54},
-  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh-gia-tu-1-ty-den-2-ty-sdpr2",visits:83,users:33},
-  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-nha-dat-phuong-tan-thoi-nhat-quan-12-tp-ho-chi-minh",visits:79,users:46},
+  {campaign:"digital_dau_pty_sell_apartment_hcm_dsa_lead_2025",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-can-ho-chung-cu-quan-12-tp-ho-chi-minh",visits:98,users:68},
+  {campaign:"digital_dau_pty_sell_houses_hcm_dsa_lead_2025",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-phuong-an-phu-dong-quan-12-tp-ho-chi-minh",visits:88,users:55},
+  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-nha-dat-phuong-tan-thoi-nhat-quan-12-tp-ho-chi-minh",visits:84,users:50},
+  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh-gia-tu-1-ty-den-2-ty-sdpr2",visits:84,users:33},
   {campaign:"digital_dau_pty_sell_houses_q12_pmax_lead_2026",source:"google",medium:"pmax",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh",visits:79,users:53},
-  {campaign:"digital_dau_pty_sell_houses_hcm_dsa_lead_2025",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-phuong-tan-thoi-nhat-quan-12-tp-ho-chi-minh",visits:74,users:41},
-  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-nha-dat-phuong-tan-thoi-hiep-quan-12-tp-ho-chi-minh",visits:73,users:33},
-  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-nha-dat-phuong-dong-hung-thuan-quan-12-tp-ho-chi-minh",visits:70,users:48},
-  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-nha-dat-phuong-an-phu-dong-quan-12-tp-ho-chi-minh",visits:69,users:46},
-  {campaign:"digital_dau_pty_sell_vn_pmax_adview_2026",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-dat-phuong-an-phu-dong-quan-12-tp-ho-chi-minh",visits:68,users:49},
-  {campaign:"digital_dau_pty_sell_apartment_hcm_pmax_lead_2026",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-can-ho-chung-cu-quan-12-tp-ho-chi-minh",visits:64,users:28},
+  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-nha-dat-phuong-an-phu-dong-quan-12-tp-ho-chi-minh",visits:76,users:50},
+  {campaign:"digital_dau_pty_sell_houses_hcm_dsa_lead_2025",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-phuong-tan-thoi-nhat-quan-12-tp-ho-chi-minh",visits:76,users:42},
+  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-nha-dat-phuong-tan-thoi-hiep-quan-12-tp-ho-chi-minh",visits:74,users:33},
+  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-nha-dat-phuong-dong-hung-thuan-quan-12-tp-ho-chi-minh",visits:72,users:49},
+  {campaign:"digital_dau_pty_sell_apartment_hcm_pmax_lead_2026",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-can-ho-chung-cu-quan-12-tp-ho-chi-minh",visits:70,users:33},
+  {campaign:"digital_dau_pty_sell_vn_pmax_adview_2026",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-dat-phuong-an-phu-dong-quan-12-tp-ho-chi-minh",visits:69,users:50},
   {campaign:"digital_dau_pty_sell_houses_hcm_dsa_lead_2025",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh-gia-tu-3-ty-den-5-ty-sdpr4",visits:61,users:24},
+  {campaign:"digital_dau_pty_sell_houses_hcm_dsa_lead_2025",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-phuong-dong-hung-thuan-quan-12-tp-ho-chi-minh",visits:60,users:35},
+  {campaign:"(organic)",source:"bing",medium:"organic",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh",visits:58,users:25},
   {campaign:"(none)",source:"(direct)",medium:"(none)",content:null,page_slug:"mua-ban-bat-dong-san-phuong-thoi-an-quan-12-tp-ho-chi-minh",visits:58,users:8},
-  {campaign:"(organic)",source:"bing",medium:"organic",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh",visits:57,users:25},
-  {campaign:"digital_dau_pty_sell_houses_hcm_dsa_lead_2025",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-phuong-dong-hung-thuan-quan-12-tp-ho-chi-minh",visits:57,users:34},
   {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-nha-dat-phuong-hiep-thanh-quan-12-tp-ho-chi-minh",visits:56,users:21},
-  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-nha-dat-phuong-thanh-loc-quan-12-tp-ho-chi-minh",visits:53,users:37},
-  {campaign:"(none)",source:"(direct)",medium:"(none)",content:null,page_slug:"mua-ban-bat-dong-san-phuong-hiep-thanh-quan-12-tp-ho-chi-minh",visits:53,users:18},
+  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-nha-dat-phuong-thanh-loc-quan-12-tp-ho-chi-minh",visits:55,users:38},
   {campaign:"(none)",source:"(direct)",medium:"(none)",content:null,page_slug:"mua-ban-bat-dong-san-phuong-an-phu-dong-quan-12-tp-ho-chi-minh",visits:53,users:15},
-  {campaign:"zalo",source:"zalo",medium:"zalo",content:null,page_slug:"mua-ban-dat-quan-12-tp-ho-chi-minh",visits:49,users:31},
+  {campaign:"(none)",source:"(direct)",medium:"(none)",content:null,page_slug:"mua-ban-bat-dong-san-phuong-hiep-thanh-quan-12-tp-ho-chi-minh",visits:53,users:18},
+  {campaign:"zalo",source:"zalo",medium:"zalo",content:null,page_slug:"mua-ban-dat-quan-12-tp-ho-chi-minh",visits:53,users:33},
+  {campaign:"digital_dau_pty_sell_houses_hcm_dsa_lead_2025",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh-gia-tu-2-ty-den-3-ty-sdpr3",visits:49,users:40},
   {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-dat-phuong-an-phu-dong-quan-12-tp-ho-chi-minh",visits:49,users:33},
   {campaign:"digital_dau_pty_sell_land_hcm_dsa_lead_2025",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-dat-phuong-an-phu-dong-quan-12-tp-ho-chi-minh",visits:48,users:35},
-  {campaign:"digital_dau_pty_sell_houses_hcm_dsa_lead_2025",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh-gia-tu-2-ty-den-3-ty-sdpr3",visits:47,users:38},
-  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh-gia-tu-2-ty-den-3-ty-sdpr3",visits:46,users:33},
+  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh-gia-tu-2-ty-den-3-ty-sdpr3",visits:48,users:34},
 ];
 const SNAPSHOT_TRAFFIC_TREND_TOTAL = [
   {date:"2026-07-01",visits:2996},{date:"2026-07-02",visits:3888},{date:"2026-07-03",visits:2536},{date:"2026-07-04",visits:2183},
@@ -1409,9 +1412,9 @@ const SNAPSHOT_TRAFFIC_TREND_TOTAL = [
   {date:"2026-07-21",visits:657},{date:"2026-07-22",visits:586},{date:"2026-07-23",visits:725},{date:"2026-07-24",visits:732},
   {date:"2026-07-25",visits:814},{date:"2026-07-26",visits:658},{date:"2026-07-27",visits:634},{date:"2026-07-28",visits:1048},
   {date:"2026-07-29",visits:1122},{date:"2026-07-30",visits:717},{date:"2026-07-31",visits:796},{date:"2026-08-01",visits:769},
-  {date:"2026-08-02",visits:929},{date:"2026-08-03",visits:759},{date:"2026-08-04",visits:849},
+  {date:"2026-08-02",visits:929},{date:"2026-08-03",visits:759},{date:"2026-08-04",visits:849},{date:"2026-08-05",visits:751},
 ];
-const SNAPSHOT_TRAFFIC_CAMPAIGN_HEADLINE = 2123;
+const SNAPSHOT_TRAFFIC_CAMPAIGN_HEADLINE = 2232;
 
 async function loadUTMBreakdown() {
   return SNAPSHOT_UTM_ROWS;
@@ -1460,7 +1463,7 @@ async function renderUTMTable() {
   populateDatalists(utmRawRows);
   renderUTMGrid(utmRawRows);
   const totalVisits = utmRawRows.reduce((s,r)=>s+Number(r.visits||0),0);
-  status.textContent = `SNAPSHOT (chốt 04/08/2026) · top ${utmRawRows.length} dòng theo visits (không phải toàn bộ) · tổng visits (top)=${fmt(totalVisits)}`;
+  status.textContent = `SNAPSHOT (chốt 07/08/2026) · top ${utmRawRows.length} dòng theo visits (không phải toàn bộ) · tổng visits (top)=${fmt(totalVisits)}`;
   return totalVisits;
 }
 
@@ -1482,7 +1485,7 @@ async function renderTrafficTrend() {
   });
   const totalVisits = series.reduce((s,v)=>s+v,0);
   document.getElementById('trafficHeadline').textContent = fmt(totalVisits);
-  status.textContent = `SNAPSHOT (chốt 04/08/2026) · tổng visits = ${fmt(totalVisits)} · lưu ý: filter page/campaign/source/medium/content không áp dụng được trong bản snapshot tĩnh này, xem bản Cowork live để lọc`;
+  status.textContent = `SNAPSHOT (chốt 07/08/2026) · tổng visits = ${fmt(totalVisits)} · lưu ý: filter page/campaign/source/medium/content không áp dụng được trong bản snapshot tĩnh này, xem bản Cowork live để lọc`;
   return totalVisits;
 }
 
@@ -1510,11 +1513,11 @@ async function renderTrafficCampaignHeadline() {
   const noteEl = document.getElementById('trafficCampaignNote');
   const valEl = document.getElementById('trafficCampaignHeadline');
   valEl.textContent = fmt(SNAPSHOT_TRAFFIC_CAMPAIGN_HEADLINE);
-  noteEl.textContent = 'SNAPSHOT (chốt 04/08/2026)';
+  noteEl.textContent = 'SNAPSHOT (chốt 07/08/2026)';
 }
 
 // ==== SNAPSHOT TĨNH (2026-08-04) — data đóng băng, BuilderOS không có cầu nối live cho các nguồn này ====
-const SNAPSHOT_TREND_ROWS = [
+const SNAPSHOT_TREND_ROWS_OLD_UNUSED = [
   {date:"2026-07-13",dau:1,dwl:1,lead:20},{date:"2026-07-14",dau:2,dwl:1,lead:29},{date:"2026-07-15",dau:1,dwl:1,lead:69},
   {date:"2026-07-16",dau:1,dwl:0,lead:18},{date:"2026-07-17",dau:4,dwl:0,lead:49},{date:"2026-07-18",dau:8,dwl:1,lead:22},
   {date:"2026-07-19",dau:6,dwl:4,lead:45},{date:"2026-07-20",dau:25,dwl:3,lead:47},{date:"2026-07-21",dau:31,dwl:1,lead:60},
@@ -1524,16 +1527,36 @@ const SNAPSHOT_TREND_ROWS = [
   {date:"2026-07-31",dau:172,dwl:13,lead:69},{date:"2026-08-01",dau:118,dwl:6,lead:102},{date:"2026-08-02",dau:211,dwl:15,lead:72},
   {date:"2026-08-03",dau:102,dwl:7,lead:120},{date:"2026-08-04",dau:119,dwl:14,lead:74},
 ];
-const SNAPSHOT_CAMPAIGN_DAU_MAU = { totalDau: 4856, totalDauWLead: 876 };
+const SNAPSHOT_CAMPAIGN_DAU_MAU_OLD_UNUSED = { totalDau: 4856, totalDauWLead: 876 };
+// ---------- DAU/DWL/Lead theo campaign quảng cáo trả phí — SNAPSHOT mới (2026-08-07, theo yêu cầu Lox) ----------
+// Query mới CHỈ tính 4 campaign quảng cáo trả phí cụ thể (Google Pmax/Search + Meta) đổ về các trang mua bán
+// Q12 — KHÔNG phải toàn bộ ngành hàng PTY, và là SỐ TRUNG BÌNH/NGÀY (avg_dau, avg_dwl) cộng dồn theo campaign,
+// khác hẳn tổng DAU toàn kênh trước đây — nên số nhỏ hơn nhiều (đo hiệu quả quảng cáo trả phí, không phải sức
+// khỏe funnel tổng). Nguồn: chotot-dwh.ct_digital.kiet_digital_campaign_daily, 14 ngày gần nhất.
+const CAMPAIGN_DAU_DWL_CACHE = {
+  asOf: '2026-08-07',
+  windowLabel: '14 ngày gần nhất (tính đến hôm qua)',
+  source: 'chotot-dwh.ct_digital.kiet_digital_campaign_daily',
+  rows: [
+    { campaign: 'digital_dau_pty_sell_apartment_q12_search_lead_2026', platform: 'Google', active_days: 13, avg_dau: 1.846154, avg_dwl: 0.307692, total_lead: 13, total_cost: 497286.39, cost_per_avg_dau: 269363.46, cost_per_avg_dwl: 1616180.76, cost_per_lead: 38252.80 },
+    { campaign: 'digital_dau_pty_sell_house_q12_search_lead_2026', platform: 'Google', active_days: 12, avg_dau: 0.25, avg_dwl: 0, total_lead: 0, total_cost: 248093.97, cost_per_avg_dau: 992375.90, cost_per_avg_dwl: null, cost_per_lead: null },
+    { campaign: 'digital_dau_pty_sell_houses_q12_pmax_lead_2026', platform: 'Google', active_days: 13, avg_dau: 160.307692, avg_dwl: 7.384615, total_lead: 308, total_cost: 2515141.78, cost_per_avg_dau: 15689.46, cost_per_avg_dwl: 340592.12, cost_per_lead: 8166.04 },
+    { campaign: 'fb_growth_pty_web_pro_thodia_bau_072126_atc_HCM', platform: 'Meta', active_days: 12, avg_dau: 6.333333, avg_dwl: 0, total_lead: 0, total_cost: 1373613.57, cost_per_avg_dau: 216886.35, cost_per_avg_dwl: null, cost_per_lead: null },
+  ]
+};
+function shortCampaignLabel(name) {
+  return name.replace('digital_dau_pty_sell_', '').replace('fb_growth_pty_web_pro_', '').replace(/_2026$/, '').replace(/_072126_atc_HCM$/, '');
+}
 const SNAPSHOT_APP_INSTALL_ROWS = [
-  {date:"2026-07-13",installs:1},{date:"2026-07-14",installs:1},{date:"2026-07-15",installs:1},{date:"2026-07-16",installs:0},
-  {date:"2026-07-17",installs:1},{date:"2026-07-18",installs:17},{date:"2026-07-19",installs:36},{date:"2026-07-20",installs:53},
-  {date:"2026-07-21",installs:63},{date:"2026-07-22",installs:154},{date:"2026-07-23",installs:284},{date:"2026-07-24",installs:308},
-  {date:"2026-07-25",installs:383},{date:"2026-07-26",installs:220},{date:"2026-07-27",installs:466},{date:"2026-07-28",installs:425},
-  {date:"2026-07-29",installs:434},{date:"2026-07-30",installs:419},{date:"2026-07-31",installs:426},{date:"2026-08-01",installs:374},
-  {date:"2026-08-02",installs:413},{date:"2026-08-03",installs:453},{date:"2026-08-04",installs:81},
+  {date:"2026-07-13",installs:5},{date:"2026-07-14",installs:31},{date:"2026-07-15",installs:45},{date:"2026-07-16",installs:38},
+  {date:"2026-07-17",installs:38},{date:"2026-07-18",installs:66},{date:"2026-07-19",installs:59},{date:"2026-07-20",installs:49},
+  {date:"2026-07-21",installs:77},{date:"2026-07-22",installs:206},{date:"2026-07-23",installs:330},{date:"2026-07-24",installs:363},
+  {date:"2026-07-25",installs:467},{date:"2026-07-26",installs:494},{date:"2026-07-27",installs:468},{date:"2026-07-28",installs:426},
+  {date:"2026-07-29",installs:463},{date:"2026-07-30",installs:481},{date:"2026-07-31",installs:453},{date:"2026-08-01",installs:381},
+  {date:"2026-08-02",installs:413},{date:"2026-08-03",installs:477},{date:"2026-08-04",installs:436},{date:"2026-08-05",installs:432},
+  {date:"2026-08-06",installs:387},
 ];
-const SNAPSHOT_GOOGLE_ADS_TOTALS = { impressions: 887252, clicks: 23341, installs: 3763, cost: 36745206.896251 };
+const SNAPSHOT_GOOGLE_ADS_TOTALS = { impressions: 1003935, clicks: 27457, installs: 4340, cost: 42906967.624145 };
 const SNAPSHOT_INSTALL_CONTRIB_ROWS = [
   {date:"2026-07-13",grp:"Brand activities",installs:5},{date:"2026-07-14",grp:"Brand activities",installs:31},
   {date:"2026-07-15",grp:"Brand activities",installs:46},{date:"2026-07-16",grp:"Brand activities",installs:39},
@@ -1552,93 +1575,102 @@ const SNAPSHOT_INSTALL_CONTRIB_ROWS = [
   {date:"2026-07-31",grp:"Brand activities",installs:95},{date:"2026-08-01",grp:"Brand activities",installs:84},
   {date:"2026-08-01",grp:"Digital app install",installs:298},{date:"2026-08-02",grp:"Digital app install",installs:318},
   {date:"2026-08-02",grp:"Brand activities",installs:95},{date:"2026-08-03",grp:"Digital app install",installs:373},
-  {date:"2026-08-03",grp:"Brand activities",installs:106},{date:"2026-08-04",grp:"Digital app install",installs:347},
-  {date:"2026-08-04",grp:"Brand activities",installs:93},
+  {date:"2026-08-03",grp:"Brand activities",installs:106},{date:"2026-08-04",grp:"Brand activities",installs:93},
+  {date:"2026-08-04",grp:"Digital app install",installs:347},{date:"2026-08-05",grp:"Brand activities",installs:104},
+  {date:"2026-08-05",grp:"Digital app install",installs:329},{date:"2026-08-06",grp:"Brand activities",installs:85},
+  {date:"2026-08-06",grp:"Digital app install",installs:302},
 ];
 const SNAPSHOT_INSTALL_BREAKDOWN_ROWS = [
-  {source:"google.adwords",medium:"ACI",campaign:"gg_growth_pty_app_android_install_app_maxinstall_thodia_bau_072126_HCM",content:null,installs:2430},
-  {source:"google.adwords",medium:"ACI",campaign:"gg_growth_pty_app_android_install_app_maxinstall_thodia_bau_072126_VN",content:null,installs:1852},
-  {source:"facebook.business",medium:"facebook",campaign:"brand_reach_pty_thodiacamp_b2c_0726_0826",content:"OUTCOME_AWARENESS",installs:570},
-  {source:"facebook.business",medium:"facebook",campaign:"brand_reach_sale_pty_thodiacamp_exclude_fanengaged_b2c_hcm_0726_0826",content:"OUTCOME_AWARENESS",installs:371},
-  {source:"facebook.business",medium:"facebook",campaign:"brand_eng_sale_pty_thodiacamp_b2c_exclude_quan12_0726_0826",content:"OUTCOME_ENGAGEMENT",installs:247},
-  {source:"facebook.business",medium:"facebook",campaign:"brand_eng_sale_pty_thodiacamp_b2c_quan12_0726_0826",content:"OUTCOME_ENGAGEMENT",installs:179},
-  {source:"facebook.business",medium:"facebook",campaign:"fb_growth_pty_app_android_install_app_pro_thodia_bau_072126_HCM_atc",content:"APP_INSTALLS",installs:148},
-  {source:"facebook.business",medium:"facebook",campaign:"fb_growth_pty_app_android_install_app_rtg_thodia_bau_072126_VN_atc",content:"APP_INSTALLS",installs:138},
-  {source:"facebook.business",medium:"facebook",campaign:"fb_growth_pty_app_android_install_app_pro_thodia_bau_072126_VN_atc",content:"APP_INSTALLS",installs:138},
+  {source:"google.adwords",medium:"ACI",campaign:"gg_growth_pty_app_android_install_app_maxinstall_thodia_bau_072126_HCM",content:null,installs:2672},
+  {source:"google.adwords",medium:"ACI",campaign:"gg_growth_pty_app_android_install_app_maxinstall_thodia_bau_072126_VN",content:null,installs:2124},
+  {source:"facebook.business",medium:"facebook",campaign:"brand_reach_pty_thodiacamp_b2c_0726_0826",content:"OUTCOME_AWARENESS",installs:647},
+  {source:"facebook.business",medium:"facebook",campaign:"brand_reach_sale_pty_thodiacamp_exclude_fanengaged_b2c_hcm_0726_0826",content:"OUTCOME_AWARENESS",installs:375},
+  {source:"facebook.business",medium:"facebook",campaign:"brand_eng_sale_pty_thodiacamp_b2c_exclude_quan12_0726_0826",content:"OUTCOME_ENGAGEMENT",installs:277},
+  {source:"facebook.business",medium:"facebook",campaign:"fb_growth_pty_app_android_install_app_pro_thodia_bau_072126_HCM_atc",content:"APP_INSTALLS",installs:194},
+  {source:"facebook.business",medium:"facebook",campaign:"brand_eng_sale_pty_thodiacamp_b2c_quan12_0726_0826",content:"OUTCOME_ENGAGEMENT",installs:186},
+  {source:"facebook.business",medium:"facebook",campaign:"fb_growth_pty_app_android_install_app_rtg_thodia_bau_072126_VN_atc",content:"APP_INSTALLS",installs:172},
+  {source:"facebook.business",medium:"facebook",campaign:"fb_growth_pty_app_android_install_app_pro_thodia_bau_072126_VN_atc",content:"APP_INSTALLS",installs:163},
+  {source:"facebook.business",medium:"facebook",campaign:"brand_reach_sale_pty_thodiacamp_only_fanengaged_b2c_hcm_0726_0826",content:"OUTCOME_AWARENESS",installs:109},
   {source:"facebook.business",medium:"facebook",campaign:"brand_eng_sale_pty_thodiacamp_b2c_0726_0826",content:"OUTCOME_ENGAGEMENT",installs:54},
-  {source:"facebook.business",medium:"facebook",campaign:"brand_reach_sale_pty_thodiacamp_only_fanengaged_b2c_hcm_0726_0826",content:"OUTCOME_AWARENESS",installs:40},
   {source:"facebook.business",medium:"facebook",campaign:"brand_eng_sale_pty_thodiacamp_KV_b2c_0726_0826",content:"OUTCOME_ENGAGEMENT",installs:36},
   {source:"ooh",medium:"growth_offline",campaign:"tho_dia_camp",content:"l2_1",installs:31},
   {source:"facebook.business",medium:"facebook",campaign:"brand_eng_pty_thodiacamp_b2b_0726_0826",content:"OUTCOME_ENGAGEMENT",installs:21},
   {source:"facebook.business",medium:"facebook",campaign:"brand_eng_sale_pty_thodiacamp_b2c_0726",content:"OUTCOME_ENGAGEMENT",installs:13},
+  {source:"facebook.business",medium:"facebook",campaign:"fb_growth_pty_app_android_install_app_pro_thodia_bau_080526_HCM_atc_targeting",content:"APP_INSTALLS",installs:9},
   {source:"facebook.business",medium:"facebook",campaign:"fb_growth_pty_app_android_install_app_rtg_thodiacamp_bau_072126_VN_atc",content:"APP_INSTALLS",installs:6},
-  {source:"facebook.business",medium:"threads",campaign:"fb_growth_pty_app_android_install_app_rtg_thodia_bau_072126_VN_atc",content:"APP_INSTALLS",installs:4},
-  {source:"facebook.business",medium:"instagram",campaign:"fb_growth_pty_app_android_install_app_rtg_thodia_bau_072126_VN_atc",content:"APP_INSTALLS",installs:4},
-  {source:"facebook.business",medium:"threads",campaign:"fb_growth_pty_app_android_install_app_pro_thodia_bau_072126_HCM_atc",content:"APP_INSTALLS",installs:4},
-  {source:"facebook.business",medium:"instagram",campaign:"fb_growth_pty_app_android_install_app_pro_thodia_bau_072126_VN_atc",content:"APP_INSTALLS",installs:3},
-  {source:"facebook.business",medium:"instagram",campaign:"fb_growth_pty_app_android_install_app_pro_thodia_bau_072126_HCM_atc",content:"APP_INSTALLS",installs:3},
+  {source:"facebook.business",medium:"threads",campaign:"fb_growth_pty_app_android_install_app_rtg_thodia_bau_072126_VN_atc",content:"APP_INSTALLS",installs:6},
+  {source:"facebook.business",medium:"instagram",campaign:"fb_growth_pty_app_android_install_app_rtg_thodia_bau_072126_VN_atc",content:"APP_INSTALLS",installs:5},
   {source:"banner",medium:"floatingbutton",campaign:"tho_dia_camp",content:null,installs:3},
+  {source:"facebook.business",medium:"threads",campaign:"fb_growth_pty_app_android_install_app_pro_thodia_bau_072126_HCM_atc",content:"APP_INSTALLS",installs:4},
   {source:"facebook.business",medium:"threads",campaign:"fb_growth_pty_app_android_install_app_pro_thodia_bau_072126_VN_atc",content:"APP_INSTALLS",installs:3},
+  {source:"facebook.business",medium:"instagram",campaign:"brand_eng_sale_pty_thodiacamp_b2c_exclude_quan12_0726_0826",content:"OUTCOME_ENGAGEMENT",installs:3},
+  {source:"facebook.business",medium:"instagram",campaign:"fb_growth_pty_app_android_install_app_pro_thodia_bau_072126_VN_atc",content:"APP_INSTALLS",installs:3},
   {source:"facebook.business",medium:"facebook",campaign:"fb_growth_pty_app_android_install_app_pro_thodiacamp_bau_072126_HCM_atc",content:"APP_INSTALLS",installs:3},
-  {source:"ooh",medium:"growth_offline",campaign:"tho_dia_camp",content:"l1_5",installs:3},
-  {source:"ooh",medium:"growth_offline",campaign:"tho_dia_camp",content:"l2_7",installs:2},
+  {source:"facebook.business",medium:"instagram",campaign:"fb_growth_pty_app_android_install_app_pro_thodia_bau_072126_HCM_atc",content:"APP_INSTALLS",installs:3},
   {source:"ooh",medium:"growth_offline",campaign:"tho_dia_camp",content:"l2_4",installs:2},
   {source:"ooh",medium:"growth_offline",campaign:"tho_dia_camp",content:"l2_2",installs:2},
-  {source:"facebook.business",medium:"instagram",campaign:"brand_eng_sale_pty_thodiacamp_b2c_exclude_quan12_0726_0826",content:"OUTCOME_ENGAGEMENT",installs:2},
-  {source:"facebook.business",medium:"threads",campaign:"brand_eng_sale_pty_thodiacamp_b2c_quan12_0726_0826",content:"OUTCOME_ENGAGEMENT",installs:1},
-  {source:"ooh",medium:"growth_offline",campaign:"tho_dia_camp",content:"l2_6",installs:1},
+  {source:"facebook.business",medium:"threads",campaign:"brand_eng_sale_pty_thodiacamp_b2c_quan12_0726_0826",content:"OUTCOME_ENGAGEMENT",installs:2},
+  {source:"ooh",medium:"growth_offline",campaign:"tho_dia_camp",content:"l2_7",installs:2},
+  {source:"ooh",medium:"growth_offline",campaign:"tho_dia_camp",content:"l1_5",installs:3},
   {source:"facebook.business",medium:"instagram",campaign:"brand_eng_sale_pty_thodiacamp_b2c_quan12_0726_0826",content:"OUTCOME_ENGAGEMENT",installs:1},
+  {source:"ooh",medium:"growth_offline",campaign:"tho_dia_camp",content:"l2_6",installs:1},
   {source:"ooh",medium:"growth_offline",campaign:"tho_dia_camp",content:"l3_2",installs:1},
 ];
 
 let trendChartInstance = null;
 async function renderTrend() {
   const status = document.getElementById('trendStatus');
-  try {
-    const rows = SNAPSHOT_TREND_ROWS;
-    const dates = rows.map(r => r.date);
-    const dauSeries = rows.map(r => Number(r.dau));
-    const dwlSeries = rows.map(r => Number(r.dwl));
-    const leadSeries = rows.map(r => Number(r.lead));
-    const ctx = document.getElementById('trendChart');
-    if (trendChartInstance) trendChartInstance.destroy();
-    trendChartInstance = new Chart(ctx, {
-      type: 'line',
-      data: { labels: dates, datasets: [
-        { label: 'DAU (visits, trang mua bán Q12)', data: dauSeries, borderColor: '#F5811F', backgroundColor: 'rgba(245,129,31,0.12)', fill: true, tension: 0.25 },
-        { label: 'DWL (users có lead trong ngày)', data: dwlSeries, borderColor: '#2563AA', backgroundColor: 'rgba(37,99,170,0.12)', fill: true, tension: 0.25 },
-        { label: 'Lead (tổng số lượt lead trong ngày)', data: leadSeries, borderColor: '#1B8A5A', backgroundColor: 'rgba(27,138,90,0.10)', fill: true, tension: 0.25 },
-      ]},
-      options: { responsive: true, maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${fmt(c.raw)}` } } } }
-    });
-    const totalDau = dauSeries.reduce((s,v)=>s+v,0);
-    const totalDwl = dwlSeries.reduce((s,v)=>s+v,0);
-    const totalLead = leadSeries.reduce((s,v)=>s+v,0);
-    status.textContent = `SNAPSHOT (chốt 04/08/2026) · ${dates.length} ngày · tổng DAU=${fmt(totalDau)}, tổng DWL=${fmt(totalDwl)}, tổng Lead=${fmt(totalLead)}`;
-    renderDauHeadline(totalDau, totalDwl, totalLead);
-    return { totalDau, totalDwl, totalLead };
-  } catch (e) {
-    status.innerHTML = `<div class="err">Lỗi: ${e.message}</div>`;
-    renderDauHeadline(null, null, null);
-    return { totalDau: 0, totalDwl: 0, totalLead: 0 };
-  }
+  const rows = CAMPAIGN_DAU_DWL_CACHE.rows;
+  const labels = rows.map(r => `${shortCampaignLabel(r.campaign)} (${r.platform})`);
+  const dauSeries = rows.map(r => r.avg_dau);
+  const dwlSeries = rows.map(r => r.avg_dwl);
+  const ctx = document.getElementById('trendChart');
+  if (trendChartInstance) trendChartInstance.destroy();
+  trendChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [
+      { label: 'Avg DAU/ngày', data: dauSeries, backgroundColor: '#F5811F' },
+      { label: 'Avg DWL/ngày', data: dwlSeries, backgroundColor: '#2563AA' },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${fmt2(c.raw)}` } } },
+      scales: { y: { beginAtZero: true } } }
+  });
+  const totalDau = dauSeries.reduce((s,v)=>s+v,0);
+  const totalDwl = dwlSeries.reduce((s,v)=>s+v,0);
+  const totalLead = rows.reduce((s,r)=>s+r.total_lead,0);
+  status.innerHTML = `<span class="badge snapshot">SNAPSHOT</span> chốt ${CAMPAIGN_DAU_DWL_CACHE.asOf} · ${CAMPAIGN_DAU_DWL_CACHE.windowLabel} · nguồn ${CAMPAIGN_DAU_DWL_CACHE.source} · tổng avg DAU=${fmt2(totalDau)}, avg DWL=${fmt2(totalDwl)}, Lead=${fmt(totalLead)}`;
+  renderTrendCostTable(rows);
+  renderDauHeadline(totalDau, totalDwl, totalLead);
+  return { totalDau, totalDwl, totalLead };
+}
+
+function renderTrendCostTable(rows) {
+  const el = document.getElementById('trendCostTable');
+  if (!el) return;
+  const rowsHtml = rows.map(r => `<tr><td>${shortCampaignLabel(r.campaign)}</td><td>${r.platform}</td>
+    <td class="num">${r.active_days}</td><td class="num">${fmt2(r.avg_dau)}</td><td class="num">${fmt2(r.avg_dwl)}</td>
+    <td class="num">${fmt(r.total_lead)}</td><td class="num">${fmt(r.total_cost)}</td>
+    <td class="num">${fmt(r.cost_per_avg_dau)}</td><td class="num">${fmt(r.cost_per_avg_dwl)}</td><td class="num">${fmt(r.cost_per_lead)}</td></tr>`).join('');
+  el.innerHTML = `<table style="width:100%;font-size:12.5px;border-collapse:collapse;">
+    <thead><tr><th>Campaign</th><th>Platform</th><th class="num">Active days</th><th class="num">Avg DAU</th><th class="num">Avg DWL</th>
+    <th class="num">Total Lead</th><th class="num">Total Cost (VND)</th><th class="num">Cost/avg DAU</th><th class="num">Cost/avg DWL</th><th class="num">Cost/Lead</th></tr></thead>
+    <tbody>${rowsHtml}</tbody></table>`;
 }
 
 function renderDauHeadline(totalDau, totalDwl, totalLead, appInstallTotal) {
   const grid = document.getElementById('dauHeadline');
   const hasAppInstall = appInstallTotal !== undefined && appInstallTotal !== null;
   const tiles = [
-    { label: 'DAU', value: totalDau, tag: 'live' },
-    { label: 'DWL', value: totalDwl, tag: 'live' },
-    { label: 'Lead', value: totalLead, tag: 'live', extra: 'Tổng số lượt lead (1 user có thể tạo nhiều lead)' },
+    { label: 'Avg DAU/ngày (paid, Q12)', value: totalDau, tag: 'snapshot', extra: 'Cộng dồn avg DAU/ngày của 4 campaign quảng cáo trả phí đổ về trang Q12 — không phải toàn bộ PTY' },
+    { label: 'Avg DWL/ngày (paid, Q12)', value: totalDwl, tag: 'snapshot' },
+    { label: 'Lead (paid, Q12, 14 ngày)', value: totalLead, tag: 'snapshot', extra: 'Tổng số lượt lead (1 user có thể tạo nhiều lead)' },
     { label: 'App Install', value: hasAppInstall ? appInstallTotal : null, tag: hasAppInstall ? 'live' : 'blocked',
       extra: hasAppInstall ? 'Target: 20,200 · nguồn Airbridge (airbridge_raw_data_app_install, SUM install_devices)' : 'Target: 20,200 · cần Airbridge/Branch.io' },
   ];
   grid.innerHTML = tiles.map(t => {
-    const badge = t.tag === 'blocked' ? '<span class="badge blocked">BLOCKED</span>' : '<span class="badge snapshot">SNAPSHOT</span>';
-    return `<div class="htile"><div class="hlabel">${t.label} ${badge}</div><div class="hvalue">${t.value===null?'—':fmt(t.value)}</div>${t.extra?`<div class="htarget">${t.extra}</div>`:''}</div>`;
+    const badge = t.tag === 'blocked' ? '<span class="badge blocked">BLOCKED</span>' : (t.tag === 'snapshot' ? '<span class="badge snapshot">SNAPSHOT</span>' : '<span class="badge live">LIVE</span>');
+    return `<div class="htile"><div class="hlabel">${t.label} ${badge}</div><div class="hvalue">${t.value===null?'—':fmt2(t.value)}</div>${t.extra?`<div class="htarget">${t.extra}</div>`:''}</div>`;
   }).join('');
 }
 
@@ -1648,9 +1680,8 @@ async function loadCampaignDWL() {
 
 async function loadCampaignDauMau() {
   const el = document.getElementById('campaignDauMauNote');
-  const { totalDau, totalDauWLead } = SNAPSHOT_CAMPAIGN_DAU_MAU;
-  if (el) el.textContent = `Đối chiếu (bảng chuẩn campaign DAU/MAU, mtm_chotot_vertical_channel_campaign_dau_mau) · SNAPSHOT: DAU=${fmt(totalDau)} · DAU w Lead=${fmt(totalDauWLead)}`;
-  return { totalDau, totalDauWLead };
+  if (el) el.textContent = '';
+  return null;
 }
 
 async function loadAppInstallData() {
@@ -1687,7 +1718,7 @@ async function loadGoogleAdsAppInstall() {
     <div class="htile"><div class="hlabel">Installs <span class="badge snapshot">SNAPSHOT</span></div><div class="hvalue">${fmt(totals.installs)}</div></div>
     <div class="htile"><div class="hlabel">Cost <span class="badge snapshot">SNAPSHOT</span></div><div class="hvalue">${fmt(totals.cost)}</div></div>
   `;
-  if (status) status.textContent = `SNAPSHOT (chốt 04/08/2026) · campaign chứa "tho_dia"/"thodia" (không có reach/engagement)`;
+  if (status) status.textContent = `SNAPSHOT (chốt 07/08/2026) · campaign chứa "tho_dia"/"thodia" (không có reach/engagement)`;
   return totals;
 }
 
@@ -1710,7 +1741,7 @@ async function loadInstallContribution() {
     <div class="htile"><div class="hlabel">Brand activities <span class="badge snapshot">SNAPSHOT</span></div><div class="hvalue">${fmt(brandTotal)}</div><div class="htarget">${pct(brandTotal)}</div></div>
   `;
   renderContribChart(dates, dates.map(d => digitalByDate[d] || 0), dates.map(d => brandByDate[d] || 0));
-  if (status) status.textContent = `SNAPSHOT (chốt 04/08/2026) · ${dates.length} ngày · tổng ${fmt(grandTotal)} install (Digital ${fmt(digitalTotal)} · Brand ${fmt(brandTotal)})`;
+  if (status) status.textContent = `SNAPSHOT (chốt 07/08/2026) · ${dates.length} ngày · tổng ${fmt(grandTotal)} install (Digital ${fmt(digitalTotal)} · Brand ${fmt(brandTotal)})`;
 }
 
 let contribChartInstance = null;
@@ -1745,7 +1776,7 @@ async function loadInstallBreakdownTable() {
   }).render(container);
   const total = rows.reduce((s, r) => s + (Number(r.installs) || 0), 0);
   const campaignCount = new Set(rows.map(r => r.campaign)).size;
-  if (status) status.textContent = `SNAPSHOT (chốt 04/08/2026) · ${campaignCount} campaign · tổng ${fmt(total)} install`;
+  if (status) status.textContent = `SNAPSHOT (chốt 07/08/2026) · ${campaignCount} campaign · tổng ${fmt(total)} install`;
 }
 
 let channelChartInstance = null;
@@ -1775,6 +1806,8 @@ const SNAPSHOT_CHANNEL_GROUPING_ROWS = [
   {date:"2026-08-03",ch:"Paid Search",dau:72,dwl:6},{date:"2026-08-03",ch:"Display",dau:12,dwl:0},{date:"2026-08-03",ch:"Growth",dau:9,dwl:1},
   {date:"2026-08-03",ch:"(Other)",dau:9,dwl:0},{date:"2026-08-04",ch:"Paid Search",dau:83,dwl:11},{date:"2026-08-04",ch:"Display",dau:10,dwl:0},
   {date:"2026-08-04",ch:"Growth",dau:12,dwl:3},{date:"2026-08-04",ch:"(Other)",dau:14,dwl:0},
+  {date:"2026-08-05",ch:"Paid Search",dau:78,dwl:11},{date:"2026-08-05",ch:"Display",dau:7,dwl:0},
+  {date:"2026-08-05",ch:"(Other)",dau:9,dwl:0},{date:"2026-08-05",ch:"Growth",dau:11,dwl:6},
 ];
 const SNAPSHOT_SOURCE_MEDIUM_ROWS = [
   {date:"2026-07-13",ch:"adtima / social",dau:1,dwl:1},{date:"2026-07-14",ch:"facebook / social",dau:1,dwl:0},{date:"2026-07-14",ch:"adtima / social",dau:1,dwl:1},
@@ -1804,6 +1837,9 @@ const SNAPSHOT_SOURCE_MEDIUM_ROWS = [
   {date:"2026-08-03",ch:"facebook / display",dau:12,dwl:0},{date:"2026-08-04",ch:"facebook / display",dau:10,dwl:0},{date:"2026-08-04",ch:"banner / floatingbutton",dau:11,dwl:3},
   {date:"2026-08-04",ch:"google / cpc",dau:83,dwl:11},{date:"2026-08-04",ch:"adtima / social",dau:13,dwl:0},{date:"2026-08-04",ch:"pr / social",dau:1,dwl:0},
   {date:"2026-08-04",ch:"banner / web_to_app",dau:1,dwl:0},
+  {date:"2026-08-05",ch:"google / cpc",dau:78,dwl:11},{date:"2026-08-05",ch:"banner / web_to_app",dau:2,dwl:2},{date:"2026-08-05",ch:"adtima / social",dau:8,dwl:0},
+  {date:"2026-08-05",ch:"banner / floatingbutton",dau:8,dwl:3},{date:"2026-08-05",ch:"pr / social",dau:1,dwl:0},{date:"2026-08-05",ch:"facebook / display",dau:7,dwl:0},
+  {date:"2026-08-05",ch:"banner / ssa",dau:1,dwl:1},
 ];
 
 function renderChannelChart() {
@@ -1829,7 +1865,7 @@ async function renderChannelBreakdown() {
   const status = document.getElementById('channelStatus');
   channelRawRows = SNAPSHOT_CHANNEL_GROUPING_ROWS;
   renderChannelChart();
-  status.textContent = `SNAPSHOT (chốt 04/08/2026) · ${Array.from(new Set(channelRawRows.map(r=>r.ch))).length} channel grouping`;
+  status.textContent = `SNAPSHOT (chốt 07/08/2026) · ${Array.from(new Set(channelRawRows.map(r=>r.ch))).length} channel grouping`;
 }
 
 let sourceMediumChartInstance = null;
@@ -1857,10 +1893,10 @@ async function renderSourceMediumBreakdown() {
   const status = document.getElementById('sourceMediumStatus');
   sourceMediumRawRows = SNAPSHOT_SOURCE_MEDIUM_ROWS;
   renderSourceMediumChart();
-  status.textContent = `SNAPSHOT (chốt 04/08/2026) · ${Array.from(new Set(sourceMediumRawRows.map(r=>r.ch))).length} source/medium`;
+  status.textContent = `SNAPSHOT (chốt 07/08/2026) · ${Array.from(new Set(sourceMediumRawRows.map(r=>r.ch))).length} source/medium`;
 }
 
-// ---------- OOH Monitor — SNAPSHOT TĨNH (chốt 04/08/2026) ----------
+// ---------- OOH Monitor — SNAPSHOT TĨNH (chốt 07/08/2026) ----------
 const OOH_LAUNCH_DATE = '2026-07-22';
 const OOH_CONTENT_TOP_N = 8;
 let oohContentDailyRawRows = [];
@@ -1873,6 +1909,7 @@ const SNAPSHOT_OOH_FUNNEL_ROWS = [
   {date:"2026-07-30",clicks:10,installs:null,opens:null,web_opens:null},{date:"2026-07-31",clicks:15,installs:null,opens:1,web_opens:null},
   {date:"2026-08-01",clicks:0,installs:null,opens:null,web_opens:null},{date:"2026-08-02",clicks:2,installs:null,opens:null,web_opens:null},
   {date:"2026-08-03",clicks:13,installs:1,opens:1,web_opens:null},{date:"2026-08-04",clicks:0,installs:null,opens:2,web_opens:null},
+  {date:"2026-08-05",clicks:15,installs:null,opens:2,web_opens:null},{date:"2026-08-06",clicks:6,installs:null,opens:3,web_opens:null},
 ];
 const SNAPSHOT_OOH_CONTENT_DAILY_ROWS = [
   {date:"2026-07-10",utm_content:"l2_3",clicks:3},{date:"2026-07-10",utm_content:"l2_2",clicks:3},{date:"2026-07-10",utm_content:"l2_1",clicks:2},
@@ -1907,13 +1944,19 @@ const SNAPSHOT_OOH_CONTENT_DAILY_ROWS = [
   {date:"2026-08-03",utm_content:"l3_1",clicks:0},{date:"2026-08-03",utm_content:"l1_13",clicks:0},{date:"2026-08-03",utm_content:"l2_4",clicks:0},
   {date:"2026-08-03",utm_content:"l2_1",clicks:3},{date:"2026-08-03",utm_content:"l1_5",clicks:10},{date:"2026-08-04",utm_content:"l2_1",clicks:0},
   {date:"2026-08-04",utm_content:"l1_5",clicks:0},
+  {date:"2026-08-05",utm_content:"l2_16",clicks:2},{date:"2026-08-05",utm_content:"l3_1",clicks:2},{date:"2026-08-05",utm_content:"l2_14",clicks:7},
+  {date:"2026-08-05",utm_content:"l1_5",clicks:0},{date:"2026-08-05",utm_content:"l2_1",clicks:0},{date:"2026-08-05",utm_content:"l2_15",clicks:2},
+  {date:"2026-08-05",utm_content:"l2_7",clicks:2},{date:"2026-08-06",utm_content:"l1_20",clicks:2},{date:"2026-08-06",utm_content:"l3_3",clicks:1},
+  {date:"2026-08-06",utm_content:"l1_5",clicks:0},{date:"2026-08-06",utm_content:"l2_1",clicks:0},{date:"2026-08-06",utm_content:"l2_14",clicks:3},
 ];
 const SNAPSHOT_OOH_RANKING_ROWS = [
-  {utm_content:"l2_1",clicks:69,installs:3,opens:4},{utm_content:"l2_7",clicks:26,installs:2,opens:1},{utm_content:"l2_4",clicks:21,installs:1,opens:3},
-  {utm_content:"l1_5",clicks:19,installs:1,opens:1},{utm_content:"l3_1",clicks:9,installs:null,opens:null},{utm_content:"l2_6",clicks:9,installs:1,opens:2},
-  {utm_content:"l3_2",clicks:8,installs:1,opens:null},{utm_content:"l2_8",clicks:7,installs:null,opens:1},{utm_content:"l2_10",clicks:4,installs:null,opens:null},
-  {utm_content:"l1_13",clicks:4,installs:null,opens:null},{utm_content:"l3_3",clicks:3,installs:null,opens:null},{utm_content:"l2_11",clicks:3,installs:null,opens:null},
-  {utm_content:"l1_9",clicks:2,installs:null,opens:null},{utm_content:"l1_12",clicks:1,installs:null,opens:null},{utm_content:"l2_2",clicks:0,installs:null,opens:2},
+  {utm_content:"l2_1",clicks:69,installs:3,opens:4},{utm_content:"l2_7",clicks:28,installs:2,opens:1},{utm_content:"l2_4",clicks:21,installs:1,opens:3},
+  {utm_content:"l1_5",clicks:19,installs:1,opens:1},{utm_content:"l3_1",clicks:11,installs:null,opens:null},{utm_content:"l2_14",clicks:10,installs:null,opens:null},
+  {utm_content:"l2_6",clicks:9,installs:1,opens:2},{utm_content:"l3_2",clicks:8,installs:1,opens:null},{utm_content:"l2_8",clicks:7,installs:null,opens:1},
+  {utm_content:"l3_3",clicks:4,installs:null,opens:null},{utm_content:"l2_10",clicks:4,installs:null,opens:null},{utm_content:"l1_13",clicks:4,installs:null,opens:null},
+  {utm_content:"l2_11",clicks:3,installs:null,opens:null},{utm_content:"l2_15",clicks:2,installs:null,opens:null},{utm_content:"l1_9",clicks:2,installs:null,opens:null},
+  {utm_content:"l2_16",clicks:2,installs:null,opens:null},{utm_content:"l1_20",clicks:2,installs:null,opens:null},{utm_content:"l1_12",clicks:1,installs:null,opens:null},
+  {utm_content:"l2_2",clicks:0,installs:null,opens:2},
 ];
 
 async function loadOOHFunnelData() {
@@ -1928,7 +1971,7 @@ async function loadOOHFunnelData() {
   }, { clicks: 0, installs: 0, opens: 0, webOpens: 0 });
   renderOOHFunnelCards(totals);
   renderOOHFunnelChart(totals);
-  if (status) status.textContent = `SNAPSHOT (chốt 04/08/2026) · từ ${OOH_LAUNCH_DATE.split('-').reverse().join('/')} (ngày launch chính thức) · ${rows.length} ngày có data`;
+  if (status) status.textContent = `SNAPSHOT (chốt 07/08/2026) · từ ${OOH_LAUNCH_DATE.split('-').reverse().join('/')} (ngày launch chính thức) · ${rows.length} ngày có data`;
   return totals;
 }
 
@@ -2039,7 +2082,7 @@ function renderOOHContentLineChart() {
       plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${fmt(c.raw)} clicks` } }, oohLaunchLine: { enabled: true } },
       scales: { x: { ticks: { maxTicksLimit: 12 } }, y: { beginAtZero: true } } }
   });
-  if (status) status.textContent = `SNAPSHOT (chốt 04/08/2026) · ${dates.length} ngày (từ 29/06) · vạch đỏ = 22/7 ngày launch chính thức`;
+  if (status) status.textContent = `SNAPSHOT (chốt 07/08/2026) · ${dates.length} ngày (từ 29/06) · vạch đỏ = 22/7 ngày launch chính thức`;
 }
 
 let oohContentStackChartInstance = null;
@@ -2088,10 +2131,10 @@ async function loadOOHRanking() {
   }).join('');
   table.innerHTML = `<thead><tr><th>Vị trí (utm_content)</th><th class="num">Click</th><th class="num">Install</th><th class="num">CR Click→Install</th><th class="num">Open App</th><th class="num">CR Click→Open</th></tr></thead>
     <tbody>${rowsHtml || '<tr><td colspan="6" style="color:var(--ink-soft)">Không có data</td></tr>'}</tbody>`;
-  if (status) status.textContent = `SNAPSHOT (chốt 04/08/2026) · từ ${OOH_LAUNCH_DATE.split('-').reverse().join('/')} · ${rows.length} vị trí`;
+  if (status) status.textContent = `SNAPSHOT (chốt 07/08/2026) · từ ${OOH_LAUNCH_DATE.split('-').reverse().join('/')} · ${rows.length} vị trí`;
 }
 
-// ---------- Paid link (Social buzz/engagement) + Adtima — SNAPSHOT TĨNH (chốt 04/08/2026) ----------
+// ---------- Paid link (Social buzz/engagement) + Adtima — SNAPSHOT TĨNH (chốt 07/08/2026) ----------
 // GHI CHÚ QUAN TRỌNG: sheet Paid Link (~100k ký tự, hàng trăm dòng caption dài) quá lớn để đóng băng an
 // toàn/rẻ trong lần snapshot này — KHÔNG bịa số, hiện rõ "chưa đóng băng được" thay vì số sai/thiếu.
 // Adtima (nhỏ hơn nhiều) đã fetch đầy đủ, có số thật.
@@ -2125,28 +2168,42 @@ function groupPostsByType(posts) {
     engagement: gposts.reduce((s,p)=>s+postEngagement(p),0),
   }));
 }
+// FIX 2026-08-07 (theo Lox): trước đây chỉ đọc được ~33% sheet Paid Link (100k+ ký tự, quá lớn để đọc trọn
+// trong 1 lần) nên để trống toàn bộ — LẦN NÀY đọc đủ 100% (157 posts) bằng cách trích riêng phần số liệu
+// (bỏ qua caption dài) rồi cộng dồn theo kênh (platform - type). Số Social buzz/engagement của sheet tự tính
+// khớp 100% với công thức postBuzz()/postEngagement() ở trên (đã verify chéo) nên dùng luôn số tổng theo kênh.
+// GIỚI HẠN: không đóng băng được chi tiết từng post (ngày/title) — bảng "Top posts" không có trong bản này.
+const SNAPSHOT_BUZZ_CHANNEL_ROWS = [
+  { name: 'Facebook - Page Ownned', post: 25, repost: 0, comment: 2779, share: 702, react: 108045, save: 415, buzz: 3506, engagement: 111941 },
+  { name: 'Tiktok - Page Ownned', post: 6, repost: 0, comment: 60, share: 85, react: 688, save: 47, buzz: 151, engagement: 880 },
+  { name: 'Youtube - Page Ownned', post: 5, repost: 0, comment: 0, share: 0, react: 26, save: 0, buzz: 5, engagement: 26 },
+  { name: 'Facebook - Group community', post: 1, repost: 0, comment: 109, share: 4, react: 99, save: 0, buzz: 114, engagement: 212 },
+  { name: 'Thread - Thead UGC', post: 111, repost: 537, comment: 2292, share: 449, react: 7202, save: 0, buzz: 3389, engagement: 10480 },
+  { name: 'Thread - Thread Ownned', post: 7, repost: 1, comment: 1, share: 6, react: 18, save: 0, buzz: 15, engagement: 26 },
+];
+const SNAPSHOT_BUZZ_TOTAL = 7180;
+const SNAPSHOT_ENGAGEMENT_TOTAL = 123565;
+
 async function loadPaidLinkSection() {
-  // Không đóng băng được trong snapshot này (sheet quá lớn) — để trống rõ ràng, không bịa số.
-  PAID_LINK_POSTS = [];
-  ALL_BUZZ_CHANNEL_NAMES = [];
-  BUZZ_CHANNELS = [];
-  TOTAL_SOCIAL_BUZZ = 0;
-  TOTAL_SOCIAL_ENGAGEMENT = 0;
-  filtersT2.channels = new Set();
+  ALL_BUZZ_CHANNEL_NAMES = SNAPSHOT_BUZZ_CHANNEL_ROWS.map(c => c.name);
+  BUZZ_CHANNELS = SNAPSHOT_BUZZ_CHANNEL_ROWS;
+  TOTAL_SOCIAL_BUZZ = SNAPSHOT_BUZZ_TOTAL;
+  TOTAL_SOCIAL_ENGAGEMENT = SNAPSHOT_ENGAGEMENT_TOTAL;
+  filtersT2.channels = new Set(ALL_BUZZ_CHANNEL_NAMES);
   renderBuzzChannelFilterCheckboxes();
   rerenderT2();
-  return { totalBuzz: 0, totalEngagement: 0, unavailable: true };
+  return { totalBuzz: TOTAL_SOCIAL_BUZZ, totalEngagement: TOTAL_SOCIAL_ENGAGEMENT };
 }
 
-const SNAPSHOT_ADTIMA_IMPRESSION_TOTAL = 596421;
-const SNAPSHOT_ADTIMA_CLICK_TOTAL = 608;
+const SNAPSHOT_ADTIMA_IMPRESSION_TOTAL = 642283;
+const SNAPSHOT_ADTIMA_CLICK_TOTAL = 636;
 const SNAPSHOT_ADTIMA_DAILY_ROWS = [
   {date:"2026-07-20",impression:11287},{date:"2026-07-21",impression:28552},{date:"2026-07-22",impression:46209},
   {date:"2026-07-23",impression:84340},{date:"2026-07-24",impression:26953},{date:"2026-07-25",impression:73836},
   {date:"2026-07-26",impression:43047},{date:"2026-07-27",impression:26276},{date:"2026-07-28",impression:18274},
   {date:"2026-07-29",impression:32094},{date:"2026-07-30",impression:62687},{date:"2026-07-31",impression:36992},
   {date:"2026-08-01",impression:14176},{date:"2026-08-02",impression:21807},{date:"2026-08-03",impression:29606},
-  {date:"2026-08-04",impression:40285},
+  {date:"2026-08-04",impression:40285},{date:"2026-08-05",impression:39000},{date:"2026-08-06",impression:6862},
 ];
 let adtimaDailyRowsCache = [];
 async function loadAdtimaSection() {
@@ -2168,42 +2225,37 @@ function computeChannelGroups(posts) {
 }
 function renderBuzzChannelFilterCheckboxes() {
   const container = document.getElementById('buzzChannelFilters');
-  container.innerHTML = ALL_BUZZ_CHANNEL_NAMES.map(name =>
-    `<label style="display:flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;"><input type="checkbox" class="chBuzzCh" data-ch="${name}" checked> ${name}</label>`
-  ).join('') || '<span style="color:var(--ink-soft);font-size:12.5px;">Chưa đóng băng được trong snapshot này — xem bản Cowork live để có số đầy đủ.</span>';
+  container.innerHTML = (ALL_BUZZ_CHANNEL_NAMES.map(name =>
+    `<label style="display:flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;"><input type="checkbox" class="chBuzzCh" data-ch="${name}" checked disabled> ${name}</label>`
+  ).join('') || '') + '<div style="width:100%;font-size:11px;color:var(--ink-soft);margin-top:4px;">Bộ lọc kênh không áp dụng cho bản snapshot này (chỉ đóng băng tổng theo kênh, không có dữ liệu từng post) — xem bản Cowork live để lọc.</div>';
 }
 
 function renderBuzzHighlight() {
   const grid = document.getElementById('buzzHighlight');
-  const posts = getFilteredPosts();
-  const buzz = posts.reduce((s,p)=>s+postBuzz(p),0);
-  const eng = posts.reduce((s,p)=>s+postEngagement(p),0);
+  const buzz = TOTAL_SOCIAL_BUZZ;
+  const eng = TOTAL_SOCIAL_ENGAGEMENT;
   const pBuzz = pct(buzz, KPI_TARGETS.socialBuzz);
   const pEng = pct(eng, KPI_TARGETS.socialEngagement);
   grid.innerHTML = `
-    <div class="htile"><div class="hlabel">Social buzz <span class="badge dummy">CHƯA CÓ</span></div><div class="hvalue">${fmt(buzz)}</div><div class="htarget">Target: ${fmt(KPI_TARGETS.socialBuzz)} · sheet quá lớn để đóng băng, xem bản Cowork live</div></div>
-    <div class="htile"><div class="hlabel">Social engagement <span class="badge dummy">CHƯA CÓ</span></div><div class="hvalue">${fmt(eng)}</div><div class="htarget">Target: ${fmt(KPI_TARGETS.socialEngagement)} · sheet quá lớn để đóng băng, xem bản Cowork live</div></div>
+    <div class="htile"><div class="hlabel">Social buzz <span class="badge snapshot">SNAPSHOT</span></div><div class="hvalue">${fmt(buzz)}</div><div class="htarget">Target: ${fmt(KPI_TARGETS.socialBuzz)} · chốt 07/08/2026 (100% posts sheet Paid Link)</div></div>
+    <div class="htile"><div class="hlabel">Social engagement <span class="badge snapshot">SNAPSHOT</span></div><div class="hvalue">${fmt(eng)}</div><div class="htarget">Target: ${fmt(KPI_TARGETS.socialEngagement)} · chốt 07/08/2026</div></div>
   `;
 }
 
 function renderDummyBuzzTables() {
-  const posts = getFilteredPosts();
-  const channels = computeChannelGroups(posts);
+  const channels = BUZZ_CHANNELS;
   const buzzTable = document.getElementById('buzzTable');
-  const rowsHtml = channels.map(c => `<tr><td>${c.name}</td><td class="num">${c.post||'—'}</td><td class="num">${c.comment||'—'}</td>
-    <td class="num">${c.share||'—'}</td><td class="num">${c.repost||'—'}</td><td class="num">${c.react||'—'}</td><td class="num">${c.save||'—'}</td>
-    <td class="num">${c.buzz||'—'}</td><td class="num">${c.engagement||'—'}</td></tr>`).join('');
+  const rowsHtml = channels.map(c => `<tr><td>${c.name}</td><td class="num">${fmt(c.post)}</td><td class="num">${fmt(c.comment)}</td>
+    <td class="num">${fmt(c.share)}</td><td class="num">${fmt(c.repost)}</td><td class="num">${fmt(c.react)}</td><td class="num">${fmt(c.save)}</td>
+    <td class="num">${fmt(c.buzz)}</td><td class="num">${fmt(c.engagement)}</td></tr>`).join('');
   buzzTable.innerHTML = `
     <thead><tr><th>Kênh</th><th class="num">Post</th><th class="num">Comment</th><th class="num">Share</th>
     <th class="num">Repost</th><th class="num">React</th><th class="num">Save</th><th class="num">Social buzz</th><th class="num">Social engagement</th></tr></thead>
-    <tbody>${rowsHtml || '<tr><td colspan="9" style="color:var(--ink-soft)">Chưa đóng băng được trong snapshot này (sheet quá lớn) — xem bản Cowork live để có số đầy đủ.</td></tr>'}</tbody>`;
+    <tbody>${rowsHtml}</tbody>`;
   const topTable = document.getElementById('topPostsTable');
-  const top20 = [...posts].sort((a,b) => postBuzz(b) - postBuzz(a)).slice(0,20);
-  const topRows = top20.map(p => `<tr><td>${p.date.split('-').reverse().join('/')}</td><td>${p.title}</td><td>${p.platform}</td><td>${p.type}</td>
-    <td class="num">${fmt(postBuzz(p))}</td><td class="num">${fmt(postEngagement(p))}</td></tr>`).join('');
   topTable.innerHTML = `
     <thead><tr><th>Ngày</th><th>Title</th><th>Platform</th><th>Type</th><th class="num">Social buzz</th><th class="num">Social engagement</th></tr></thead>
-    <tbody>${topRows || '<tr><td colspan="6" style="color:var(--ink-soft)">Chưa đóng băng được trong snapshot này — xem bản Cowork live để có số đầy đủ.</td></tr>'}</tbody>`;
+    <tbody><tr><td colspan="6" style="color:var(--ink-soft)">Chưa đóng băng chi tiết từng post trong snapshot này (chỉ đóng băng tổng theo kênh) — xem bản Cowork live để có bảng Top posts đầy đủ.</td></tr></tbody>`;
 }
 let buzzPieChartInstance = null;
 let engagementPieChartInstance = null;
