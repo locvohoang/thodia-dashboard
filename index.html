@@ -1139,11 +1139,9 @@ function renderKPIGrid(data) {
     ${trackHtml(WEEKLY_OOH_TARGET, actualTotal, 'slot')}
   `;
   grid.appendChild(oohCard);
-  ['L1','L2','L3'].forEach(k => {
-    oohCard.querySelector('#ooh'+k).addEventListener('change', (e) => {
-      const cur = loadOOHActual(); cur[k] = Number(e.target.value) || 0; saveOOHActual(cur); renderKPIGrid(data);
-    });
-  });
+  // FIX 2026-08-07: input OOH đã bị bỏ (chốt cứng số, xem loadOOHActual()) nên khối addEventListener cũ
+  // trỏ vào #oohL1/L2/L3 (không còn tồn tại) sẽ throw TypeError ngay tại đây, làm renderKPIGrid() dừng
+  // NGANG giữa hàm -- toàn bộ card sau OOH (Social buzz/engagement, DWL, App Install...) không render được.
 
   const cards = [
     { label: 'Social buzz', value: TOTAL_SOCIAL_BUZZ, target: KPI_TARGETS.socialBuzz, tag: 'snapshot', fmtFn: fmt, weeklyTarget: WEEKLY_BUZZ_TARGET },
