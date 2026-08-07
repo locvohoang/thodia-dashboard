@@ -907,6 +907,17 @@ async function loadMetaSection() {
 // bỏ luôn status-dot ACTIVE/PAUSE — hiện "LIVE" chung cho mọi campaign có data. Cost đã là USD.
 const TIKTOK_SHEET_ID = '1Nd8ft4KILE0BFrBaBinG53GGXgwt2nDIAOwLWvTSomg';
 
+// FIX 2026-08-07: parseMdRows/unescapeMd bị mất khi viết lại phần Paid Link cho bản snapshot — TikTok
+// section vẫn gọi hàm này để đọc TIKTOK_STATIC_TEXT nên bị lỗi "parseMdRows is not defined". Khôi phục lại
+// 2 hàm gốc (parser markdown table dùng chung, y hệt bản Cowork live).
+function unescapeMd(s) { return String(s == null ? '' : s).replace(/\\(.)/g, '$1').trim(); }
+function parseMdRows(text) {
+  return String(text || '').split('\n')
+    .map(l => l.trim())
+    .filter(l => l.startsWith('|'))
+    .map(l => l.slice(1, -1).split('|').map(c => unescapeMd(c)))
+    .filter(row => !row.every(c => c === '' || /^:-:$/.test(c)));
+}
 function parseTiktokDailyRows(text) {
   const rows = parseMdRows(text);
   const headerIdx = rows.findIndex(r => r.includes('Date') && r.includes('Campaign name'));
@@ -2259,7 +2270,10 @@ let buzzPieChartInstance = null;
 let engagementPieChartInstance = null;
 const PIE_COLORS = ['#F5811F','#2563AA','#1B8A5A','#B8790A','#7A5AF8','#C23B3B'];
 function renderBuzzPies() {
-  const channels = computeChannelGroups(getFilteredPosts());
+  // FIX 2026-08-07: trước đây tính từ getFilteredPosts()/computeChannelGroups() -- nhưng PAID_LINK_POSTS
+  // rỗng trong bản snapshot này (chỉ đóng băng TỔNG theo kênh, không có từng post) nên 2 pie chart này luôn
+  // ra "chưa có data" dù BUZZ_CHANNELS đã có số tổng đúng theo kênh. Đọc thẳng BUZZ_CHANNELS.
+  const channels = BUZZ_CHANNELS;
   const labels = channels.map(c => c.name);
   const buzzData = channels.map(c => c.buzz);
   const engData = channels.map(c => c.engagement);
@@ -2302,6 +2316,14 @@ let buzzByTypeChartInstance = null;
 const BUZZ_TYPE_COLORS = { Post: '#F5811F', Comment: '#2563AA', Share: '#1B8A5A', Repost: '#B8790A' };
 function renderBuzzByTypeChart() {
   const status = document.getElementById('buzzByTypeStatus');
+  // FIX 2026-08-07: bản snapshot này chỉ đóng băng TỔNG theo kênh (PAID_LINK_POSTS rỗng, không có ngày/loại
+  // từng post do sheet quá lớn + cấu trúc không đồng nhất để tách an toàn) -- chart theo NGÀY không có gì để
+  // vẽ, hiện rõ thay vì 1 chart trục 0-1 trống gây hiểu lầm là lỗi.
+  if (!PAID_LINK_POSTS.length) {
+    if (buzzByTypeChartInstance) { buzzByTypeChartInstance.destroy(); buzzByTypeChartInstance = null; }
+    status.innerHTML = '<span style="color:var(--ink-soft);">Chưa đóng băng breakdown theo ngày trong snapshot này (chỉ có tổng theo kênh) — xem bản Cowork live để có chart này.</span>';
+    return;
+  }
   const dates = buzzDateRangeArray();
   const posts = getFilteredPosts();
   const types = ['Post','Comment','Share','Repost'];
@@ -2331,6 +2353,11 @@ function renderBuzzByTypeChart() {
 let buzzByChannelChartInstance = null;
 function renderBuzzByChannelChart() {
   const status = document.getElementById('buzzByChannelStatus');
+  if (!PAID_LINK_POSTS.length) {
+    if (buzzByChannelChartInstance) { buzzByChannelChartInstance.destroy(); buzzByChannelChartInstance = null; }
+    status.innerHTML = '<span style="color:var(--ink-soft);">Chưa đóng băng breakdown theo ngày trong snapshot này (chỉ có tổng theo kênh) — xem bản Cowork live để có chart này.</span>';
+    return;
+  }
   const dates = buzzDateRangeArray();
   const posts = getFilteredPosts();
   const byDateByChannel = {};
@@ -2362,6 +2389,11 @@ let engByTypeChartInstance = null;
 const ENG_TYPE_COLORS = { Repost: '#B8790A', Comment: '#2563AA', Share: '#1B8A5A', React: '#F5811F', Save: '#7A5AF8' };
 function renderEngByTypeChart() {
   const status = document.getElementById('engByTypeStatus');
+  if (!PAID_LINK_POSTS.length) {
+    if (engByTypeChartInstance) { engByTypeChartInstance.destroy(); engByTypeChartInstance = null; }
+    status.innerHTML = '<span style="color:var(--ink-soft);">Chưa đóng băng breakdown theo ngày trong snapshot này (chỉ có tổng theo kênh) — xem bản Cowork live để có chart này.</span>';
+    return;
+  }
   const dates = buzzDateRangeArray();
   const posts = getFilteredPosts();
   const types = ['Repost','Comment','Share','React','Save'];
@@ -2392,6 +2424,11 @@ function renderEngByTypeChart() {
 let engByChannelChartInstance = null;
 function renderEngByChannelChart() {
   const status = document.getElementById('engByChannelStatus');
+  if (!PAID_LINK_POSTS.length) {
+    if (engByChannelChartInstance) { engByChannelChartInstance.destroy(); engByChannelChartInstance = null; }
+    status.innerHTML = '<span style="color:var(--ink-soft);">Chưa đóng băng breakdown theo ngày trong snapshot này (chỉ có tổng theo kênh) — xem bản Cowork live để có chart này.</span>';
+    return;
+  }
   const dates = buzzDateRangeArray();
   const posts = getFilteredPosts();
   const byDateByChannel = {};
