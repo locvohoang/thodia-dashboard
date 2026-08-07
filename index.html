@@ -2714,8 +2714,12 @@ document.getElementById('channelMetricToggle').addEventListener('click', (e) => 
   renderSourceMediumChart();
 });
 
-waitForCowork().then(refreshAll).catch(e => {
-  document.getElementById('lastUpdated').textContent = 'Lỗi khởi động: ' + e.message;
+// FIX 2026-08-07: bản GitHub Pages này HOÀN TOÀN TĨNH (mọi nguồn đã đóng băng thành hằng số SNAPSHOT_*,
+// không còn gọi callTool/window.cowork ở đâu cả) — chờ waitForCowork() ở đây là thừa và LUÔN timeout sau 15s
+// (GitHub Pages không có window.cowork), khiến refreshAll() không bao giờ chạy -> mọi bảng/chart trống trơn
+// dù data đã đúng. Gọi refreshAll() thẳng, không chờ bridge nào cả.
+refreshAll().catch(e => {
+  document.getElementById('lastUpdated').textContent = 'Lỗi: ' + e.message;
   const btn = document.getElementById('refreshBtn');
   btn.disabled = false; btn.textContent = '↻ Refresh data';
   renderRoadmap();
