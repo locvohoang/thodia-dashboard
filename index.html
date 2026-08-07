@@ -1,0 +1,2675 @@
+<!DOCTYPE html><script type="application/json" id="cowork-artifact-meta">
+{
+  "name": "Tho Dia Campaign Dashboard",
+  "schemaVersion": 1,
+  "description": "Dashboard monitor campaign Thổ Địa (Nhà Tốt, Quận 12): full-funnel Impression→Reach→Engagement→Buzz→Click→Install/DAU→DWL, budget actual vs plan, live pull từ Meta Ads (account Chotot_pty_branding_sgd) và BigQuery (chotot-dwh). Phần Social buzz/engagement, App install, click Airbridge còn dummy/blocked do thiếu nguồn — note rõ trong dashboard.",
+  "mcpTools": [
+    "mcp__9729f4da-027e-45fb-ac67-7e19aaa54e64__ads_get_ad_entities",
+    "mcp__4fc4b8ba-a2ae-4058-9b9c-d5317814b2aa__execute_sql_readonly",
+    "mcp__60cf5ccb-d632-48b4-b7c1-62541000d3da__data_query",
+    "mcp__60cf5ccb-d632-48b4-b7c1-62541000d3da__get_async_query_results",
+    "mcp__a551a5bf-ebee-4225-bc98-a6b76471a725__read_file_content"
+  ],
+  "mcpServerNames": [
+    "Facebook Ads MCP",
+    "Google Cloud BigQuery",
+    "Supermetrics Marketing Analytics",
+    "Supermetrics Marketing Analytics",
+    "Google Drive"
+  ]
+}
+</script>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Thổ Địa Campaign Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/gridjs@5.0.2/dist/gridjs.umd.js" integrity="sha384-/XXDzxe4FsGiAe50i/u9pY/Vy/uX654MHB1xoc1BJNnH1WXHhqHga9g3q5tF4gj7" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridjs@5.0.2/dist/theme/mermaid.min.css" integrity="sha384-jZvDSsmGB9oGGT/4l9bHXGoAv1OxvG/cFmSo0dZaSqmBgvQTKDBFAMftlXTmMbNW" crossorigin="anonymous">
+<style>
+  :root {
+    color-scheme: light;
+    --orange: #F5811F;
+    --orange-dark: #D9660A;
+    --ink: #1D2430;
+    --ink-soft: #5B6472;
+    --line: #E6E8EC;
+    --bg: #F7F8FA;
+    --card: #FFFFFF;
+    --green: #1B8A5A;
+    --green-bg: #E6F6EE;
+    --amber: #B8790A;
+    --amber-bg: #FEF3DC;
+    --red: #C23B3B;
+    --red-bg: #FCEAEA;
+    --blue: #2563AA;
+    --blue-bg: #E8F0FA;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  .wrap { max-width: 1320px; margin: 0 auto; padding: 20px 24px 60px; }
+
+  /* Header */
+  .hero {
+    background: linear-gradient(135deg, var(--orange) 0%, var(--orange-dark) 100%);
+    border-radius: 14px;
+    padding: 22px 26px;
+    color: #fff;
+  }
+  .hero-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+  .hero h1 { margin: 0 0 4px; font-size: 21px; font-weight: 700; }
+  .hero .sub { font-size: 12.5px; opacity: 0.92; }
+  .hero .meta { text-align: right; font-size: 12px; }
+  .refresh-btn {
+    margin-top: 8px; background: #fff; color: var(--orange-dark); border: none;
+    padding: 7px 14px; border-radius: 8px; font-weight: 600; font-size: 12.5px; cursor: pointer;
+  }
+  .refresh-btn:hover { background: #fff4ea; }
+  .refresh-btn:disabled { opacity: 0.6; cursor: default; }
+
+  /* Roadmap */
+  .roadmap { margin-top: 18px; background: rgba(255,255,255,0.14); border-radius: 10px; padding: 12px 14px; }
+  .roadmap-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; margin-bottom: 8px; }
+  .roadmap-head b { font-size: 13px; }
+  .roadmap-track { display: flex; gap: 3px; }
+  .week-block { flex: 1; position: relative; padding-top: 20px; }
+  .week-block .bar { height: 8px; border-radius: 4px; background: rgba(255,255,255,0.35); }
+  .week-block.teasing .bar { background: rgba(255,255,255,0.4); }
+  .week-block.bigboom .bar { background: rgba(0,0,0,0.28); }
+  .week-block.amplification .bar { background: rgba(255,255,255,0.85); }
+  .week-block .wk-label { position: absolute; top: 0; left: 0; right: 0; text-align: center; font-size: 9.5px; font-weight: 700; opacity: 0.85; }
+  .week-block.current .bar { box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgba(0,0,0,0.25); }
+  .week-block.current .wk-label { opacity: 1; }
+  .week-block .wk-date { position: absolute; bottom: -16px; left: 0; right: 0; text-align: center; font-size: 8.5px; opacity: 0.75; }
+  .phase-legend { display: flex; gap: 14px; margin-top: 20px; font-size: 10.5px; opacity: 0.9; flex-wrap: wrap; }
+  .phase-legend span { display: inline-flex; align-items: center; gap: 4px; }
+  .phase-legend .sw { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+
+  /* Section */
+  .section { margin-top: 22px; }
+  .section-title {
+    display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700;
+    margin-bottom: 10px; color: var(--ink);
+  }
+  .section-title .n { color: var(--orange-dark); }
+
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px;
+  }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700;
+    padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+  }
+  .badge.live { background: var(--green-bg); color: var(--green); }
+  .badge.dummy { background: var(--amber-bg); color: var(--amber); }
+  .badge.blocked { background: var(--red-bg); color: var(--red); }
+  .badge.editable { background: var(--blue-bg); color: var(--blue); }
+  .badge.snapshot { background: var(--green-bg); color: var(--green); }
+
+  /* KPI grid */
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  @media (max-width: 900px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+  .kpi {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px;
+    position: relative;
+  }
+  .kpi .label { font-size: 11.5px; color: var(--ink-soft); font-weight: 600; display:flex; justify-content: space-between; align-items:center; gap:6px; }
+  .kpi .value { font-size: 24px; font-weight: 800; margin-top: 4px; color: var(--ink); }
+  .kpi .target { font-size: 11.5px; color: var(--ink-soft); margin-top: 2px; }
+  .progress-track { height: 6px; background: #EEF0F3; border-radius: 4px; margin-top: 8px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 4px; background: var(--orange); }
+  .progress-fill.ok { background: var(--green); }
+  .progress-fill.warn { background: var(--amber); }
+  .pct-tag { font-size: 11px; font-weight: 700; margin-top: 4px; display:block; }
+  .kpi .ooh-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--line); }
+  .kpi .ooh-row input { width: 46px; border: 1px solid var(--line); border-radius: 6px; padding: 2px 5px; font-size: 12px; text-align: center; }
+
+  /* Highlight tiles */
+  .highlight-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+  @media (max-width: 900px) { .highlight-grid { grid-template-columns: repeat(2, 1fr); } }
+  .highlight-grid.cols-2 { grid-template-columns: repeat(2, 1fr); max-width: 560px; }
+  .htile { background: #FBFBFC; border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .htile .hlabel { font-size: 11px; color: var(--ink-soft); font-weight: 700; text-transform: uppercase; letter-spacing: .02em; }
+  .htile .hvalue { font-size: 20px; font-weight: 800; margin-top: 3px; }
+  .htile .htarget { font-size: 11px; color: var(--ink-soft); margin-top: 2px; }
+
+  /* Tables */
+  table.simple { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.simple th, table.simple td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); }
+  table.simple th { color: var(--ink-soft); font-weight: 700; font-size: 11.5px; text-transform: uppercase; letter-spacing: .02em; }
+  table.simple tr:last-child td { border-bottom: none; }
+  table.simple td.num, table.simple th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.total-row td { font-weight: 800; border-top: 2px solid var(--ink); }
+  tr.dummy-row td { opacity: 0.7; }
+
+  .tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+  .tab-btn { border: 1px solid var(--line); background: #fff; padding: 7px 14px; border-radius: 8px; font-size: 12.5px; font-weight: 600; cursor: pointer; color: var(--ink-soft); }
+  .tab-btn.active { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .dim-btn { border: 1px solid var(--line); background: #fff; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--ink-soft); margin-right: 6px; }
+  .dim-btn.active { background: var(--orange); color: #fff; border-color: var(--orange); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  .chart-box { position: relative; height: 280px; }
+  .chart-box.tall { height: 320px; }
+  .footnote-list { font-size: 12px; color: var(--ink-soft); margin: 0; padding-left: 18px; }
+  .footnote-list li { margin-bottom: 6px; }
+
+  .status-line { font-size: 11px; color: var(--ink-soft); margin-top: 6px; }
+  .err { font-size: 12px; color: var(--red); background: var(--red-bg); padding: 8px 10px; border-radius: 8px; }
+
+  .filter-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; align-items: flex-end; }
+  .filter-bar .fitem { display: flex; flex-direction: column; }
+  .filter-bar input[type=text] {
+    border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 12.5px;
+    background: #fff; color: var(--ink); min-width: 150px;
+  }
+  .filter-bar label { font-size: 10.5px; color: var(--ink-soft); display: block; margin-bottom: 3px; font-weight: 700; text-transform: uppercase; }
+  .filter-clear { border: none; background: transparent; color: var(--blue); font-size: 11.5px; font-weight: 700; cursor: pointer; padding: 6px 4px; }
+
+  .subhead { font-size: 12.5px; font-weight: 700; color: var(--ink); margin: 18px 0 8px; }
+  .chip-toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; margin-bottom: 8px; }
+  .chip-toggle button { border: none; background: #fff; padding: 5px 12px; font-size: 12px; font-weight: 600; cursor: pointer; color: var(--ink-soft); }
+  .chip-toggle button.active { background: var(--ink); color: #fff; }
+</style>
+</head>
+<body>
+<div style="background:#FEF3DC;color:#B8790A;padding:8px 16px;font-size:13px;font-weight:600;text-align:center;">📸 SNAPSHOT TĨNH (GitHub Pages) — chốt số lúc 04/08/2026, KHÔNG tự động cập nhật. Toàn bộ dữ liệu (Meta/TikTok/BigQuery/Sheets) đã đóng băng thành hằng số tĩnh do GitHub Pages không hỗ trợ gọi API live. Muốn số mới nhất, dùng bản Cowork artifact (live) hoặc nhờ refresh lại bản này.</div>
+<div class="wrap">
+
+  <div class="hero">
+    <div class="hero-top">
+      <div>
+        <h1>🏠 [PTY] Thổ Địa Campaign — Quận 12</h1>
+        <div class="sub">Timeline: 01/07/2026 – 30/08/2026 · TA: Millennials/Young couple 27–35, HCM</div>
+      </div>
+      <div class="meta">
+        <div>Cập nhật lúc: <span id="lastUpdated">—</span></div>
+        <div><button class="refresh-btn" id="refreshBtn" onclick="refreshAll()">↻ Refresh data</button></div>
+      </div>
+    </div>
+
+    <div class="roadmap">
+      <div class="roadmap-head">
+        <b id="roadmapPhase">Đang tính phase...</b>
+        <span id="roadmapWeek"></span>
+      </div>
+      <div class="roadmap-track" id="roadmapTrack"></div>
+      <div class="phase-legend">
+        <span><span class="sw" style="background:rgba(255,255,255,0.4)"></span> Teasing (W1–W2)</span>
+        <span><span class="sw" style="background:rgba(0,0,0,0.28)"></span> Big Boom (W3–W5)</span>
+        <span><span class="sw" style="background:rgba(255,255,255,0.85)"></span> Amplification (W6–W9)</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- SUCCESS METRICS -->
+  <div class="section" style="margin-top:20px;">
+    <div class="section-title"><span class="n">①</span> Success Metrics — Actual vs KPI</div>
+    <div class="kpi-grid" id="kpiGrid"></div>
+  </div>
+
+  <!-- BUDGET -->
+  <div class="section">
+    <div class="section-title"><span class="n">②</span> Budget Spending — Actual vs Plan</div>
+    <div class="card">
+      <table class="simple" id="budgetTable">
+        <thead><tr><th>Hoạt động / Kênh</th><th class="num">Plan (VND)</th><th class="num">Actual (VND)</th><th class="num">% Achieved</th></tr></thead>
+        <tbody id="budgetBody"></tbody>
+      </table>
+    </div>
+
+    <div class="subhead">Digital performance (track riêng, không tính vào TOTAL Budget chính)</div>
+    <div class="card">
+      <table class="simple" id="budgetDigitalTable">
+        <thead><tr><th>Hoạt động</th><th class="num">Plan (VND)</th><th class="num">Actual (VND)</th><th class="num">% Achieved</th></tr></thead>
+        <tbody id="budgetDigitalBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- FUNNEL -->
+  <div class="section">
+    <div class="section-title"><span class="n">③</span> Full-funnel: Impression → Reach → Engagement → Buzz → Click → Install/DAU → DWL</div>
+    <div class="card">
+      <div class="chart-box"><canvas id="funnelChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- DETAIL TABS -->
+  <div class="section">
+    <div class="section-title"><span class="n">④</span> Detailed performance</div>
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="t1">Awareness</button>
+      <button class="tab-btn" data-tab="t2">Social buzz &amp; Social engagement</button>
+      <button class="tab-btn" data-tab="t3">Traffic</button>
+      <button class="tab-btn" data-tab="t4">DAU/App install &amp; DWL</button>
+      <button class="tab-btn" data-tab="t5">OOH Monitor</button>
+    </div>
+
+    <div class="tab-panel active card" id="t1">
+      <div class="highlight-grid" id="awarenessHighlight"></div>
+
+      <div class="subhead">Facebook</div>
+      <table class="simple" id="metaTableFB">
+        <thead><tr><th>Campaign</th><th>Objective</th><th class="num">Impression</th><th class="num">Reach</th><th class="num">Frequency</th><th class="num">Spend (SGD)</th><th class="num">Spend (VND, est.)</th></tr></thead>
+        <tbody id="metaBodyFB"><tr><td colspan="7">Đang tải...</td></tr></tbody>
+      </table>
+      <div class="status-line" id="metaStatus"></div>
+
+      <div class="subhead">Tiktok</div>
+      <table class="simple" id="metaTableTiktok">
+        <thead><tr><th>Campaign</th><th class="num">Impression</th><th class="num">Reach</th><th class="num">Frequency</th><th class="num">Video views</th><th class="num">Spend (USD)</th><th class="num">Spend (SGD)</th><th class="num">Spend (VND, est.)</th></tr></thead>
+        <tbody id="metaBodyTiktok"><tr><td colspan="8">Đang tải...</td></tr></tbody>
+      </table>
+      <div class="status-line" id="tiktokStatus"></div>
+
+      <div class="subhead">Adtima</div>
+      <table class="simple" id="metaTableAdtima">
+        <thead><tr><th>Kênh</th><th class="num">Impression</th><th class="num">Reach</th><th class="num">Click</th><th class="num">Spend (SGD)</th></tr></thead>
+        <tbody>
+          <tr id="adtimaImpressionRow"><td>Media block Bất Động Sản (Znews) <span class="badge snapshot">SNAPSHOT</span></td><td class="num">86.048</td><td class="num">—</td><td class="num">105</td><td class="num">—</td></tr>
+        </tbody>
+      </table>
+      <div class="status-line" id="adtimaStatus"></div>
+
+      <div class="subhead">Google Ads (App Install campaign) <span style="font-weight:400;font-size:12px;color:var(--ink-soft);">— kênh trả phí bổ sung, KHÔNG có Reach/Engagement</span></div>
+      <div class="highlight-grid" id="googleAdsAppInstallGrid" style="grid-template-columns: repeat(4, 1fr); max-width:900px;"></div>
+      <div class="status-line" id="googleAdsAppInstallStatus"></div>
+
+      <div class="subhead">Impression theo ngày vs Target theo tuần (01/07 – 31/08/2026)</div>
+      <div class="chart-box tall"><canvas id="impressionTrendChart"></canvas></div>
+      <div class="status-line" id="impressionTrendNote"></div>
+
+      <div class="subhead">Impression theo ngày vs Target theo tuần — Tiktok (01/07 – 31/08/2026)</div>
+      <div class="chart-box tall"><canvas id="impressionTrendChartTiktok"></canvas></div>
+      <div class="status-line" id="impressionTrendNoteTiktok"></div>
+
+      <div class="subhead">Impression &amp; Reach theo ngày, theo từng kênh (01/07 – 31/08/2026)</div>
+      <div class="filter-bar" style="margin-bottom:6px;">
+        <div class="fitem"><label>Hiện kênh</label>
+          <div style="display:flex; gap:10px; align-items:center; height:32px;">
+            <label style="display:flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;"><input type="checkbox" id="chFacebook" checked> Facebook</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;"><input type="checkbox" id="chTiktok" checked> Tiktok</label>
+            <label style="display:flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;"><input type="checkbox" id="chAdtima" checked> Adtima</label>
+          </div>
+        </div>
+      </div>
+      <div class="chart-box tall"><canvas id="impressionByChannelChart"></canvas></div>
+      <div class="chart-box tall" style="margin-top:14px;"><canvas id="reachByChannelChart"></canvas></div>
+      <div class="status-line" id="channelStackStatus"></div>
+    </div>
+
+    <div class="tab-panel card" id="t2">
+      <div class="filter-bar">
+        <div class="fitem"><label>Từ ngày</label><input type="date" id="dateFromT2" value="2026-07-01"></div>
+        <div class="fitem"><label>Đến ngày</label><input type="date" id="dateToT2" value="2026-08-31"></div>
+        <div class="fitem"><label>Kênh (Type)</label>
+          <div id="buzzChannelFilters" style="display:flex; gap:10px; align-items:center; height:32px; flex-wrap:wrap;"></div>
+        </div>
+        <button class="filter-clear" id="clearFiltersT2">Xoá filter</button>
+      </div>
+
+      <div class="highlight-grid cols-2" id="buzzHighlight"></div>
+
+      <div class="subhead" style="margin-top:0;">% phân bổ theo kênh</div>
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+        <div class="chart-box"><canvas id="buzzPieChart"></canvas></div>
+        <div class="chart-box"><canvas id="engagementPieChart"></canvas></div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start;">
+        <div>
+          <div class="subhead" style="margin-top:0;">Social buzz theo ngày, theo loại (01/07 – 31/08/2026)</div>
+          <div class="chart-box tall"><canvas id="buzzByTypeChart"></canvas></div>
+          <div class="status-line" id="buzzByTypeStatus"></div>
+
+          <div class="subhead">Social buzz theo ngày, phân theo kênh (01/07 – 31/08/2026)</div>
+          <div class="chart-box tall"><canvas id="buzzByChannelChart"></canvas></div>
+          <div class="status-line" id="buzzByChannelStatus"></div>
+        </div>
+        <div>
+          <div class="subhead" style="margin-top:0;">Social engagement theo ngày, theo loại (01/07 – 31/08/2026)</div>
+          <div class="chart-box tall"><canvas id="engByTypeChart"></canvas></div>
+          <div class="status-line" id="engByTypeStatus"></div>
+
+          <div class="subhead">Social engagement theo ngày, phân theo kênh (01/07 – 31/08/2026)</div>
+          <div class="chart-box tall"><canvas id="engByChannelChart"></canvas></div>
+          <div class="status-line" id="engByChannelStatus"></div>
+        </div>
+      </div>
+
+      <div class="subhead">Chi tiết theo kênh</div>
+      <table class="simple" id="buzzTable"></table>
+      <div class="subhead">Top performing posts</div>
+      <table class="simple" id="topPostsTable"></table>
+    </div>
+
+    <div class="tab-panel card" id="t3">
+      <div class="err" style="background:var(--blue-bg); color:var(--ink); border-left:3px solid var(--blue); margin-bottom:14px;">
+        <b>Traffic</b> = lượt truy cập đến mọi trang "mua bán" (không tính trang thuê) trên nhatot.com có chứa "quan-12-tp-ho-chi-minh" — tự động gồm trang chung + 11 phường + mọi biến thể filter giá/loại hình. <b>Visits</b> = số visit session (COUNT DISTINCT visitId — mỗi lần vào site tính 1, không gộp theo user). <b>Users</b> = số user duy nhất (COUNT DISTINCT chotot_id).
+      </div>
+
+      <div class="filter-bar">
+        <div class="fitem"><label>Từ ngày</label><input type="date" id="dateFromT3" value="2026-07-01"></div>
+        <div class="fitem"><label>Đến ngày</label><input type="date" id="dateToT3" value="2026-08-31"></div>
+        <div class="fitem"><label>Trang (page)</label><input type="text" id="filterPage" list="dlPage" placeholder="Tất cả trang mua bán Q.12"></div>
+        <div class="fitem"><label>Campaign</label><input type="text" id="filterCampaign" list="dlCampaign" placeholder="Gõ để tìm..."></div>
+        <div class="fitem"><label>Source</label><input type="text" id="filterSource" list="dlSource" placeholder="Gõ để tìm..."></div>
+        <div class="fitem"><label>Medium</label><input type="text" id="filterMedium" list="dlMedium" placeholder="Gõ để tìm..."></div>
+        <div class="fitem"><label>Content</label><input type="text" id="filterContent" list="dlContent" placeholder="Gõ để tìm..."></div>
+        <button class="filter-clear" id="clearFiltersT3">Xoá filter</button>
+      </div>
+      <datalist id="dlCampaign"></datalist>
+      <datalist id="dlSource"></datalist>
+      <datalist id="dlMedium"></datalist>
+      <datalist id="dlContent"></datalist>
+      <datalist id="dlPage"></datalist>
+
+      <div class="highlight-grid cols-2">
+        <div class="htile">
+          <div class="hlabel">Traffic (All source) <span class="badge live">LIVE</span></div>
+          <div class="hvalue" id="trafficHeadline">—</div>
+        </div>
+        <div class="htile">
+          <div class="hlabel">Traffic (utm_campaign) <span class="badge live">LIVE</span></div>
+          <div class="hvalue" id="trafficCampaignHeadline">—</div>
+          <div class="htarget" id="trafficCampaignNote"></div>
+        </div>
+      </div>
+
+      <div class="subhead">Traffic theo ngày</div>
+      <div class="chart-box tall"><canvas id="trafficTrendChart"></canvas></div>
+      <div class="status-line" id="trafficTrendStatus"></div>
+
+      <div class="subhead">Traffic theo Source / Medium / Content, theo ngày</div>
+      <div style="margin-bottom:8px;">
+        <button class="dim-btn active" data-dim="source" id="dimBtnSource">Source</button>
+        <button class="dim-btn" data-dim="medium" id="dimBtnMedium">Medium</button>
+        <button class="dim-btn" data-dim="content" id="dimBtnContent">Content</button>
+      </div>
+      <div class="chart-box tall"><canvas id="campaignBreakdownChart"></canvas></div>
+      <div class="status-line" id="campaignBreakdownStatus"></div>
+
+      <div class="subhead">Breakdown theo Source / Medium / Content</div>
+      <div id="utmTableContainer"></div>
+      <div class="status-line" id="utmStatus"></div>
+    </div>
+
+    <div class="tab-panel card" id="t4">
+      <div class="err" style="background:var(--blue-bg); color:var(--ink); border-left:3px solid var(--blue); margin-bottom:14px;">
+        <b>DAU</b> = users truy cập, <b>DWL</b> = users có ≥1 lead trong ngày — cả hai tính trên mọi trang "mua bán" Quận 12 trên nhatot.com (không tính trang thuê). <b>App Install</b> = số device cài app quy về campaign (SUM install_devices, nguồn Airbridge — airbridge_raw_data_app_install, campaign chứa "tho_dia"/"thodia").
+      </div>
+
+      <div class="filter-bar">
+        <div class="fitem"><label>Từ ngày</label><input type="date" id="dateFromT4" value="2026-07-01"></div>
+        <div class="fitem"><label>Đến ngày</label><input type="date" id="dateToT4" value="2026-08-31"></div>
+        <div class="fitem"><label>Campaign</label><input type="text" id="filterCampaign2" list="dlCampaign" placeholder="Gõ để tìm..."></div>
+        <div class="fitem"><label>Source</label><input type="text" id="filterSource2" list="dlSource" placeholder="Gõ để tìm..."></div>
+        <div class="fitem"><label>Medium</label><input type="text" id="filterMedium2" list="dlMedium" placeholder="Gõ để tìm..."></div>
+        <div class="fitem"><label>Content</label><input type="text" id="filterContent2" list="dlContent" placeholder="Gõ để tìm..."></div>
+        <button class="filter-clear" id="clearFiltersT4">Xoá filter</button>
+      </div>
+
+      <div class="highlight-grid cols-2" id="dauHeadline" style="grid-template-columns: repeat(4, 1fr); max-width:900px;"></div>
+      <div class="status-line" id="appInstallStatus"></div>
+
+      <div class="subhead">DAU / DWL theo ngày</div>
+      <div class="chart-box tall"><canvas id="trendChart"></canvas></div>
+      <div class="status-line" id="trendStatus"></div>
+      <div class="status-line" id="campaignDauMauNote" style="font-style:italic;"></div>
+
+      <div class="subhead">DAU / DWL theo Channel Grouping — theo ngày</div>
+      <div class="chip-toggle" id="channelMetricToggle">
+        <button data-metric="dau" class="active">DAU</button>
+        <button data-metric="dwl">DWL</button>
+      </div>
+      <div class="chart-box tall"><canvas id="channelChart"></canvas></div>
+      <div class="status-line" id="channelStatus"></div>
+
+      <div class="subhead">DAU/DWL theo Source/Medium — theo ngày</div>
+      <div class="chart-box tall"><canvas id="sourceMediumChart"></canvas></div>
+      <div class="status-line" id="sourceMediumStatus"></div>
+
+      <div class="subhead">App Install theo ngày</div>
+      <div class="chart-box tall"><canvas id="appInstallChart"></canvas></div>
+
+      <div class="subhead">App Install contribution — Brand activities vs Digital app install</div>
+      <div class="highlight-grid cols-2" id="contribHeadline" style="grid-template-columns: repeat(2, 1fr); max-width:520px;"></div>
+      <div class="chart-box tall"><canvas id="contribChart"></canvas></div>
+      <div class="status-line" id="contribStatus"></div>
+
+      <div class="subhead">Toàn bộ campaign Thổ Địa — chi tiết install</div>
+      <div class="status-line" style="margin-bottom:6px;">Search theo source / medium / campaign. Source = <code>channel</code>, Medium = <code>sub_publisher</code> (Airbridge).</div>
+      <div id="installTableContainer"></div>
+      <div class="status-line" id="installTableStatus"></div>
+    </div>
+
+    <div class="tab-panel card" id="t5">
+      <div class="err" style="background:var(--blue-bg); color:var(--ink); border-left:3px solid var(--blue); margin-bottom:14px;">
+        <b>OOH Monitor</b> — hiệu quả riêng kênh OOH (utm_source=ooh), campaign Thổ Địa. Sau khi Click, user rẽ vào 1 trong 3 nhánh (không cộng dồn tuyến tính, có thể trùng người): <b>Install</b> (chưa có app → cài mới), <b>Open App</b> (đã có app → mở thẳng qua deeplink, hoặc mở sau khi vừa cài), <b>Open Web</b> (fallback msite khi máy không vào được app/store — số nhỏ vì đa số flow OOH vào thẳng app/store thành công). Mỗi nhánh có % riêng so với Click, không nối CR liên tục giữa các nhánh. Số tổng/funnel/xếp hạng tính từ <b>22/7/2026</b> (ngày OOH chính thức launch) — trước đó chỉ là test nội bộ, không tính vào số thật.
+      </div>
+
+      <div class="highlight-grid" id="oohFunnelHighlight" style="grid-template-columns: repeat(4, 1fr); max-width:900px;"></div>
+      <div class="status-line" id="oohFunnelStatus"></div>
+
+      <div class="subhead">Funnel OOH: Click → Install / Open App / Open Web (song song)</div>
+      <div class="card"><div class="chart-box"><canvas id="oohFunnelChart"></canvas></div></div>
+
+      <div class="subhead">Click theo ngày, theo từng vị trí OOH (utm_content)</div>
+      <div class="chart-box tall"><canvas id="oohContentLineChart"></canvas></div>
+      <div class="status-line" id="oohContentLineStatus"></div>
+
+      <div class="subhead">Click theo ngày — tổng thể kênh OOH (cột chồng theo vị trí)</div>
+      <div class="chart-box tall"><canvas id="oohContentStackChart"></canvas></div>
+
+      <div class="subhead">Xếp hạng theo vị trí OOH (utm_content) — từ 22/7</div>
+      <table class="simple" id="oohRankingTable"></table>
+      <div class="status-line" id="oohRankingStatus"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const AD_ACCOUNT_ID = '697690298835029';
+const REACH_CAMPAIGN_NAME = 'brand_reach_pty_thodiacamp_b2c_0726_0826';
+// FIX 2026-07-31 (theo Lox): số Reach ở KPI Success Metrics giờ lấy TỔNG reach của 2 campaign này (Impression
+// vẫn giữ nguyên chỉ theo REACH_CAMPAIGN_NAME — Lox chỉ yêu cầu đổi mỗi ô Reach, không đổi gì khác).
+const RF_REACH_CAMPAIGN_NAMES = ['brand_reach_pty_thodiacamp_b2c_0726_0826', 'brand_reach_sale_pty_thodiacamp_exclude_fanengaged_b2c_hcm_0726_0826'];
+const FX_SGD_VND = 20000;
+const CAMPAIGN_START = '2026-07-01';
+const CAMPAIGN_END = '2026-08-31';
+
+// TikTok Ads (via Supermetrics) — account Chotot_brand
+const TIKTOK_ACCOUNT_ID = '6966879607479894018';
+const TIKTOK_CAMPAIGN_FILTER = 'thodiacamp'; // campaign_name =@ filter
+// Tỷ giá tra ngày 15/07/2026 (xe.com/Yahoo Finance) — spend Tiktok tính bằng USD, quy đổi tạm bằng rate thị trường
+// vì chưa có rate cố định của Finance như SGD->VND (20,000). Lox confirm nếu cần dùng rate ngân sách chính thức khác.
+const FX_USD_SGD = 1.294;
+const FX_USD_VND = 26260;
+
+const KPI_TARGETS = { socialBuzz: 25699, socialEngagement: 180833, awarenessCoverage: 58, dwl: 118, appInstall: 20200 };
+const RF_TARGET = { impression: 12000000, reach: 1200000 };
+const AWARENESS_TARGET = { impression: 20720000, reach: 3180000, frequency: 6.5, budgetSGD: 14500 };
+
+const WEEKLY_IMPRESSION_TARGET = [
+  { week: 'W1', start: '2026-06-29', end: '2026-07-05', target: 720000 },
+  { week: 'W2', start: '2026-07-06', end: '2026-07-12', target: 1200000 },
+  { week: 'W3', start: '2026-07-13', end: '2026-07-19', target: 2091513 },
+  { week: 'W4', start: '2026-07-20', end: '2026-07-26', target: 3342269 },
+  { week: 'W5', start: '2026-07-27', end: '2026-08-02', target: 5433782 },
+  { week: 'W6', start: '2026-08-03', end: '2026-08-09', target: 1837692 },
+  { week: 'W7', start: '2026-08-10', end: '2026-08-16', target: 2245865 },
+  { week: 'W8', start: '2026-08-17', end: '2026-08-23', target: 2449039 },
+  { week: 'W9', start: '2026-08-24', end: '2026-08-30', target: 2061000 },
+];
+// Target Impression riêng cho Tiktok (Reach&Frequency + View), theo sheet Media plan — W1/W2 = 0 vì Tiktok chưa chạy
+const WEEKLY_IMPRESSION_TARGET_TIKTOK = [
+  { week: 'W1', start: '2026-06-29', end: '2026-07-05', target: 0 },
+  { week: 'W2', start: '2026-07-06', end: '2026-07-12', target: 0 },
+  { week: 'W3', start: '2026-07-13', end: '2026-07-19', target: 939513 },
+  { week: 'W4', start: '2026-07-20', end: '2026-07-26', target: 1409269 },
+  { week: 'W5', start: '2026-07-27', end: '2026-08-02', target: 2348782 },
+  { week: 'W6', start: '2026-08-03', end: '2026-08-09', target: 768692 },
+  { week: 'W7', start: '2026-08-10', end: '2026-08-16', target: 960865 },
+  { week: 'W8', start: '2026-08-17', end: '2026-08-23', target: 1153039 },
+  { week: 'W9', start: '2026-08-24', end: '2026-08-30', target: 981000 },
+];
+const PHASES = [
+  { name: 'TEASING', from: '2026-06-29', to: '2026-07-12', weeks: ['W1','W2'] },
+  { name: 'BIG BOOM', from: '2026-07-13', to: '2026-08-02', weeks: ['W3','W4','W5'] },
+  { name: 'AMPLIFICATION', from: '2026-08-03', to: '2026-08-30', weeks: ['W6','W7','W8','W9'] },
+];
+
+// Nguồn: sheet "Tho_Dia_2026_Weekly_KPI_Breakdown" (dòng TOTAL Social Buzz / TOTAL Social Engagement, tất cả kênh cộng lại)
+const WEEKLY_BUZZ_TARGET = [
+  { week: 'W1', start: '2026-06-29', end: '2026-07-05', target: 1242 },
+  { week: 'W2', start: '2026-07-06', end: '2026-07-12', target: 1931 },
+  { week: 'W3', start: '2026-07-13', end: '2026-07-19', target: 2711 },
+  { week: 'W4', start: '2026-07-20', end: '2026-07-26', target: 4017 },
+  { week: 'W5', start: '2026-07-27', end: '2026-08-02', target: 6588 },
+  { week: 'W6', start: '2026-08-03', end: '2026-08-09', target: 3595 },
+  { week: 'W7', start: '2026-08-10', end: '2026-08-16', target: 2586 },
+  { week: 'W8', start: '2026-08-17', end: '2026-08-23', target: 1665 },
+  { week: 'W9', start: '2026-08-24', end: '2026-08-30', target: 1364 },
+];
+const WEEKLY_ENGAGEMENT_TARGET = [
+  { week: 'W1', start: '2026-06-29', end: '2026-07-05', target: 6800 },
+  { week: 'W2', start: '2026-07-06', end: '2026-07-12', target: 11030 },
+  { week: 'W3', start: '2026-07-13', end: '2026-07-19', target: 19268 },
+  { week: 'W4', start: '2026-07-20', end: '2026-07-26', target: 28818 },
+  { week: 'W5', start: '2026-07-27', end: '2026-08-02', target: 46676 },
+  { week: 'W6', start: '2026-08-03', end: '2026-08-09', target: 20932 },
+  { week: 'W7', start: '2026-08-10', end: '2026-08-16', target: 17801 },
+  { week: 'W8', start: '2026-08-17', end: '2026-08-23', target: 16533 },
+  { week: 'W9', start: '2026-08-24', end: '2026-08-30', target: 12975 },
+];
+// Nguồn: sheet "Tho_Dia_2026_Media_Plan_v4", dòng "Facebook R&F (Continuous W1–W9)" — Impression theo tuần
+// (đã verify: tổng 9 tuần = 12,000,000, khớp chính xác RF_TARGET.impression bên dưới)
+const WEEKLY_RF_IMPRESSION_TARGET = [
+  { week: 'W1', start: '2026-06-29', end: '2026-07-05', target: 720000 },
+  { week: 'W2', start: '2026-07-06', end: '2026-07-12', target: 1200000 },
+  { week: 'W3', start: '2026-07-13', end: '2026-07-19', target: 1152000 },
+  { week: 'W4', start: '2026-07-20', end: '2026-07-26', target: 1728000 },
+  { week: 'W5', start: '2026-07-27', end: '2026-08-02', target: 2880000 },
+  { week: 'W6', start: '2026-08-03', end: '2026-08-09', target: 864000 },
+  { week: 'W7', start: '2026-08-10', end: '2026-08-16', target: 1080000 },
+  { week: 'W8', start: '2026-08-17', end: '2026-08-23', target: 1296000 },
+  { week: 'W9', start: '2026-08-24', end: '2026-08-30', target: 1080000 },
+];
+// KPI: tới hết W5 (02/08/2026) phải air xong 55/55 slot OOH -> chia đều KPI cho 3 tuần đang air (W3–W5)
+const WEEKLY_OOH_TARGET = [
+  { week: 'W1', start: '2026-06-29', end: '2026-07-05', target: 0 },
+  { week: 'W2', start: '2026-07-06', end: '2026-07-12', target: 0 },
+  { week: 'W3', start: '2026-07-13', end: '2026-07-19', target: 55/3 },
+  { week: 'W4', start: '2026-07-20', end: '2026-07-26', target: 55/3 },
+  { week: 'W5', start: '2026-07-27', end: '2026-08-02', target: 55/3 },
+  { week: 'W6', start: '2026-08-03', end: '2026-08-09', target: 0 },
+  { week: 'W7', start: '2026-08-10', end: '2026-08-16', target: 0 },
+  { week: 'W8', start: '2026-08-17', end: '2026-08-23', target: 0 },
+  { week: 'W9', start: '2026-08-24', end: '2026-08-30', target: 0 },
+];
+// Tính kế hoạch lũy kế tính đến 1 ngày bất kỳ (nội suy theo ngày trong tuần hiện tại) — dùng để so on/off track
+function cumulativeTargetToDate(weeklyArr, asOfDate) {
+  const asOf = new Date(asOfDate);
+  let sum = 0;
+  weeklyArr.forEach(w => {
+    const wStart = new Date(w.start), wEnd = new Date(w.end);
+    if (asOf < wStart) return;
+    if (asOf >= wEnd) { sum += w.target; return; }
+    const daysElapsed = Math.floor((asOf - wStart) / 86400000) + 1;
+    sum += w.target * (daysElapsed / 7);
+  });
+  return sum;
+}
+// HTML on/off-track + gap dùng chung cho các KPI card có weekly target (Reach/OOH/Buzz/Engagement)
+function trackHtml(weeklyArr, actualValue, unitLabel) {
+  const todayStr = new Date().toISOString().slice(0,10);
+  const campStart = weeklyArr[0].start, campEnd = weeklyArr[weeklyArr.length-1].end;
+  if (todayStr < campStart) return `<div class="status-line">Chưa bắt đầu campaign (từ ${campStart})</div>`;
+  if (actualValue === null || actualValue === undefined) return '';
+  const cumTarget = cumulativeTargetToDate(weeklyArr, todayStr < campEnd ? todayStr : campEnd);
+  const onTrackPct = cumTarget > 0 ? (actualValue / cumTarget) * 100 : null;
+  const gap = cumTarget - actualValue;
+  const trackBadge = onTrackPct !== null && onTrackPct >= 100
+    ? '<span class="badge live">ON TRACK</span>'
+    : '<span class="badge blocked">OFF TRACK</span>';
+  const unitTxt = unitLabel ? ` (${unitLabel})` : '';
+  return `
+    <div class="status-line" style="margin-top:6px;">${trackBadge} ${onTrackPct!==null?fmt2(onTrackPct)+'% so với kế hoạch lũy kế'+unitTxt:''}</div>
+    <div class="status-line">Kế hoạch lũy kế đến nay${unitTxt}: ${fmt(cumTarget)} · ${gap>0?`Còn thiếu ${fmt(gap)}`:`Vượt kế hoạch ${fmt(-gap)}`}</div>
+  `;
+}
+
+// actual (VND) cập nhật thủ công từ Google Sheet "[PTY] MKT Camp 2026 (Thổ Địa Camp) | Action plan" — tab
+// "Est Budget", cột "Actual spending (VND)" (theo ảnh chụp Lox gửi 2026-08-04, refresh lần 2). Item nào sheet
+// chưa có số (DWL) thì để actual: null — hiện DUMMY như cũ, không tự bịa số.
+const BUDGET_PLAN = [
+  { name: 'OOH (Jul–Aug)', plan: 1300000000, actualKey: null, actual: 1076000000, source: 'Manual', includeInTotal: true },
+  { name: 'OOH (Sep–Dec)', plan: 900000000, actualKey: null, actual: 864000000, source: 'Manual', includeInTotal: true },
+  { name: 'Collect locality data (Onboard thổ địa + CTV review)', plan: 150000000, actualKey: null, actual: 138150000, source: 'Manual', includeInTotal: true },
+  { name: 'Media — Facebook ads', plan: 150000000, actualKey: 'meta', source: 'Live (Meta Ads)', includeInTotal: true },
+  { name: 'Media — Tiktok ads', plan: 50000000, actualKey: 'tiktok', source: 'Live (Supermetrics)', includeInTotal: true },
+  { name: 'Media — Booking (Group/Tiktoker/Youtube)', plan: 200000000, actualKey: null, actual: 141600000, source: 'Manual', includeInTotal: true },
+  { name: 'Media — Threads', plan: 50000000, actualKey: null, actual: 20000000, source: 'Manual', includeInTotal: true },
+  { name: 'Media — Adtima', plan: 50000000, actualKey: null, actual: 27160000, source: 'Manual', includeInTotal: true },
+  { name: 'Media — Google Maps review + Seeding comment', plan: 50000000, actualKey: null, actual: 1850000, source: 'Manual', includeInTotal: true },
+  { name: 'App install', plan: 205458828, actualKey: null, actual: 51428200, source: 'Manual (blocked: Airbridge/Branch)', includeInTotal: false },
+  { name: 'DWL', plan: 346500000, actualKey: null, actual: null, source: 'Manual', includeInTotal: false },
+];
+
+const OOH_PLAN = { L1: 9, L2: 11, L3: 35 };
+
+// ---------- Trang ad-listing Quận 12 (Nhà Tốt, mảng "mua bán") ----------
+// FIX 2026-07-16 (lần 1): đổi sang slug "mua-ban-nha-dat-..." (từ "mua-ban-bat-dong-san-..." cũ, sai hoàn toàn).
+// FIX 2026-07-16 (lần 2): campaign Thổ Địa thật ra trỏ về "mua-ban-bat-dong-san-...", không phải "nha-dat" — gộp cả 2.
+// FIX 2026-07-16 (lần 3, theo yêu cầu Lox): thay vì liệt kê tay từng slug (sẽ luôn thiếu khi trang có filter
+// giá/loại hình/khu vực con...), match RỘNG mọi landingScreenName trên domain nhatot.com có chứa
+// "quan-12-tp-ho-chi-minh" — tự động bắt được mọi biến thể (nha-dat, bat-dong-san, mua-ban-dat, kèm filter...).
+// ĐÃ VERIFY: nếu không giới hạn domain, "quan-12-tp-ho-chi-minh" cũng khớp cả Việc Làm Tốt/Chợ Tốt Xe/Chợ Tốt
+// marketplace (hàng nghìn dòng không liên quan) — bắt buộc phải giới hạn domain=nhatot.com.
+// Theo xác nhận của Lox: KHÔNG tính các trang "thuê" (thue-nha-dat/thue-phong-tro/...) — chỉ tính "mua bán",
+// đúng với nội dung campaign (toàn bộ post đều về "mua nhà").
+// PAGES giờ chỉ dùng để NHẬN DIỆN/LABEL trang theo phường (client-side), không dùng để build WHERE nữa.
+const PAGES = [
+  { frag: null, label: 'Quận 12 (chung)' },
+  { frag: 'phuong-an-phu-dong', label: 'An Phú Đông' },
+  { frag: 'phuong-dong-hung-thuan', label: 'Đông Hưng Thuận' },
+  { frag: 'phuong-hiep-thanh', label: 'Hiệp Thành' },
+  { frag: 'phuong-tan-chanh-hiep', label: 'Tân Chánh Hiệp' },
+  { frag: 'phuong-tan-hung-thuan', label: 'Tân Hưng Thuận' },
+  { frag: 'phuong-tan-thoi-hiep', label: 'Tân Thới Hiệp' },
+  { frag: 'phuong-tan-thoi-nhat', label: 'Tân Thới Nhất' },
+  { frag: 'phuong-thanh-loc', label: 'Thạnh Lộc' },
+  { frag: 'phuong-thanh-xuan', label: 'Thạnh Xuân' },
+  { frag: 'phuong-thoi-an', label: 'Thới An' },
+  { frag: 'phuong-trung-my-tay', label: 'Trung Mỹ Tây' },
+];
+// FIX 2026-07-28 (theo data team): điều kiện cũ dùng LIKE '%nhatot.com%' + LIKE '%quan-12-tp-ho-chi-minh%' +
+// NOT LIKE '%/thue-%' quá lỏng (đã verify: khớp cả url không đúng nhóm trang "mua bán ... quận 12"). Đổi sang
+// REGEXP_CONTAINS đúng pattern path thật, cùng cách match với campaignVisitWhereClause() bên dưới.
+function pagesWhereClause(alias) {
+  const a = alias ? alias + '.' : '';
+  return `REGEXP_CONTAINS(${a}landingScreenName, r'nhatot\.com/mua-ban-[a-z0-9-]*quan-12-tp-ho-chi-minh')`;
+}
+// FIX 2026-07-27 (theo quyet dinh cua Lox): dieu kien "visit thuoc campaign Tho Dia" dung THONG NHAT cho
+// moi noi tinh Traffic/DAU/DWL/Lead theo campaign (utm_campaign) -- khac pagesWhereClause() o tren (chi loc
+// dung trang Q.12, KHONG loc campaign/loai bo OOH). Regex landingScreenName gioi han dung nhom trang "mua
+// ban ... quan 12", campaign phai chua "tho_dia" hoac "thodia" HOAC la 1 trong cac utm_campaign digital
+// rieng biet duoi day (khong chua "tho_dia"/"thodia" trong ten nhung van thuoc cung 1 sang kien PTY Q12,
+// theo yeu cau Lox 2026-07-28), va loai bo source=ooh (OOH khong co UTM that, de lan vao neu source bi set nham).
+function campaignVisitWhereClause(alias) {
+  const a = alias ? alias + '.' : '';
+  const extraCampaigns = ['digital_dau_pty_sell_house_q12_search_lead_2026', 'digital_dau_pty_sell_apartment_q12_search_lead_2026', 'digital_dau_pty_sell_houses_q12_pmax_lead_2026'];
+  const extraCampaignsSql = extraCampaigns.map(c => `LOWER(${a}campaign) = '${c}'`).join(' OR ');
+  return `(REGEXP_CONTAINS(${a}landingScreenName, r'nhatot\.com/mua-ban-[a-z0-9-]*quan-12-tp-ho-chi-minh') AND (LOWER(${a}campaign) LIKE '%tho_dia%' OR LOWER(${a}campaign) LIKE '%thodia%' OR ${extraCampaignsSql}) AND LOWER(${a}source) != 'ooh')`;
+}
+// slug ở đây là toàn bộ path segment thật (REGEXP_EXTRACT trả về), có thể có đuôi filter giá/loại hình...
+function pageLabel(slug) {
+  if (!slug) return 'Quận 12 (chung)';
+  const p = PAGES.find(x => x.frag && slug.includes(x.frag));
+  return p ? p.label : 'Quận 12 (chung)';
+}
+// Trả về mệnh đề SQL bổ sung để lọc đúng 1 trang cụ thể Lox chọn trong dropdown "Trang".
+function pageFilterClause(label, alias) {
+  const a = alias ? alias + '.' : '';
+  if (!label) return '';
+  const p = PAGES.find(x => x.label.toLowerCase() === label.toLowerCase());
+  if (!p) return '';
+  return p.frag ? ` AND ${a}landingScreenName LIKE '%${p.frag}%'` : ` AND ${a}landingScreenName NOT LIKE '%phuong-%'`;
+}
+// Dùng để lọc client-side trên page_slug đã REGEXP_EXTRACT (khớp cùng logic với pageFilterClause).
+function slugMatchesLabel(slug, label) {
+  if (!label) return true;
+  const p = PAGES.find(x => x.label.toLowerCase() === label.toLowerCase());
+  if (!p) return true;
+  return p.frag ? (slug||'').includes(p.frag) : !(slug||'').includes('phuong-');
+}
+
+function loadOOHActual() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('thodia_ooh_actual') || 'null');
+    if (saved) return saved;
+  } catch (e) {}
+  return { L1: 0, L2: 2, L3: 0 };
+}
+function saveOOHActual(v) { localStorage.setItem('thodia_ooh_actual', JSON.stringify(v)); }
+
+function fmt(n) { if (n === null || n === undefined || isNaN(n)) return '—'; return Math.round(n).toLocaleString('vi-VN'); }
+function fmt2(n) { if (n === null || n === undefined || isNaN(n)) return '—'; return n.toLocaleString('vi-VN', { maximumFractionDigits: 2 }); }
+function pct(actual, target) { if (!target) return null; return (actual / target) * 100; }
+function pctClass(p) { if (p === null) return ''; if (p >= 90) return 'ok'; if (p >= 50) return 'warn'; return ''; }
+function todayISO() { return new Date().toISOString().slice(0,10); }
+function clampDate(d) { return d > todayISO() ? todayISO() : d; }
+function esc(s) { return String(s).replace(/'/g, "\\'"); }
+function statusDot(isActive, label) {
+  const color = isActive ? '#1B8A5A' : '#C23B3B';
+  const title = label || (isActive ? 'Active' : 'Ended/Paused');
+  return `<span title="${title}" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${color};margin-right:6px;"></span>`;
+}
+
+function computePhaseInfo() {
+  const today = new Date();
+  const w1start = new Date('2026-06-29');
+  for (let i = 0; i < PHASES.length; i++) {
+    const p = PHASES[i];
+    if (today >= new Date(p.from) && today <= new Date(p.to)) {
+      const weekIdx = Math.floor((today - w1start) / 604800000);
+      return { phaseIdx: i, phaseName: p.name, weekLabel: 'W' + (weekIdx + 1), weekIdx };
+    }
+  }
+  if (today < w1start) return { phaseIdx: -1, phaseName: 'Chưa bắt đầu (Pre-launch)', weekLabel: '', weekIdx: -1 };
+  return { phaseIdx: PHASES.length, phaseName: 'Đã kết thúc campaign', weekLabel: '', weekIdx: 9 };
+}
+
+function renderRoadmap() {
+  const info = computePhaseInfo();
+  document.getElementById('roadmapPhase').textContent =
+    info.phaseIdx >= 0 && info.phaseIdx < PHASES.length ? `Phase ${info.phaseIdx + 1}/3 — ${info.phaseName}` : info.phaseName;
+  document.getElementById('roadmapWeek').textContent =
+    info.weekIdx >= 0 && info.weekIdx < 9 ? `Tuần ${info.weekIdx + 1}/9 (${info.weekLabel})` : '';
+  const track = document.getElementById('roadmapTrack');
+  track.innerHTML = '';
+  WEEKLY_IMPRESSION_TARGET.forEach((w, i) => {
+    let phaseClass = 'teasing';
+    if (PHASES[1].weeks.includes(w.week)) phaseClass = 'bigboom';
+    if (PHASES[2].weeks.includes(w.week)) phaseClass = 'amplification';
+    const isCurrent = i === info.weekIdx;
+    const div = document.createElement('div');
+    div.className = 'week-block ' + phaseClass + (isCurrent ? ' current' : '');
+    div.innerHTML = `<div class="wk-label">${w.week}${isCurrent ? ' ●' : ''}</div><div class="bar"></div><div class="wk-date">${w.start.slice(8,10)}/${w.start.slice(5,7)}</div>`;
+    track.appendChild(div);
+  });
+}
+
+function waitForCowork(timeoutMs = 15000, intervalMs = 150) {
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    (function poll() {
+      if (window.cowork && typeof window.cowork.callMcpTool === 'function') { resolve(); return; }
+      if (Date.now() - start > timeoutMs) { reject(new Error('Cowork bridge chưa sẵn sàng. Thử "Refresh data" hoặc đóng/mở lại artifact.')); return; }
+      setTimeout(poll, intervalMs);
+    })();
+  });
+}
+async function callTool(name, args) {
+  if (!window.cowork || typeof window.cowork.callMcpTool !== 'function') await waitForCowork();
+  const r = await window.cowork.callMcpTool(name, args);
+  if (r.isError) throw new Error(JSON.stringify(r.content));
+  return r.structuredContent ?? JSON.parse(r.content[0].text);
+}
+function bqRowsToObjects(result) {
+  if (!result.rows) return [];
+  const fields = result.schema.fields.map(f => f.name);
+  return result.rows.map(row => { const obj = {}; row.f.forEach((cell, i) => { obj[fields[i]] = cell.v; }); return obj; });
+}
+async function runBQ(query) {
+  const result = await callTool('mcp__4fc4b8ba-a2ae-4058-9b9c-d5317814b2aa__execute_sql_readonly', { projectId: 'chotot-dwh', query, dryRun: false });
+  return bqRowsToObjects(result);
+}
+function num(v) { if (typeof v === 'string') return parseFloat(v.replace(/[^0-9.\-]/g, '')); return v; }
+// Meta Ads API trả date_start dạng "July 14, 2026" (không phải ISO) khi dùng time_increment.
+// Chart labels dùng ISO "YYYY-MM-DD" nên phải convert thủ công (tránh dùng Date/timezone để không bị lệch ngày).
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+function metaDateToISO(str) {
+  if (!str) return str;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+  const m = str.match(/^([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})$/);
+  if (!m) return str;
+  const monthIdx = MONTH_NAMES.indexOf(m[1]);
+  if (monthIdx === -1) return str;
+  const mm = String(monthIdx + 1).padStart(2, '0');
+  const dd = String(Number(m[2])).padStart(2, '0');
+  return `${m[3]}-${mm}-${dd}`;
+}
+
+// Campaign name không chứa chung 1 substring nên phải query riêng từng filter rồi gộp lại
+// (CONTAIN với nhiều value trong 1 mảng không hoạt động như OR — đã verify).
+const META_NAME_FILTERS = ['thodiacamp', 'brand_eng_sale_pty_b2c_0726'];
+
+// ---------- SNAPSHOT TĨNH (chốt số 2026-08-04) ----------
+// BigQuery bridge trên BuilderOS đang lỗi (sa_not_provisioned) và Meta/TikTok/Google Sheets KHÔNG có cầu nối
+// live trên nền tảng này -- toàn bộ dữ liệu bên dưới được fetch MỘT LẦN từ các nguồn thật (Meta Ads API,
+// BigQuery chotot-dwh, Google Sheet) lúc 04/08/2026 rồi đóng băng thành hằng số tĩnh. KHÔNG tự bịa số.
+const SNAPSHOT_FROZEN_AT = '04/08/2026 (giờ VN)';
+
+// fetchMeta(null) -- 8 campaign, gộp cả 2 filter META_NAME_FILTERS, y hệt logic gốc (dedupe theo id).
+const META_STATIC_NOINC = [
+  { id: '120251856361570319', name: 'brand_reach_sale_pty_thodiacamp_only_fanengaged_b2c_hcm_0726_0826', objective: 'OUTCOME_AWARENESS', status: 'ACTIVE', reach: '438886', impressions: '524417', frequency: '1.194882', amount_spent: 'SGD152.77' },
+  { id: '120251446998690319', name: 'brand_eng_sale_pty_thodiacamp_b2c_exclude_quan12_0726_0826', objective: 'OUTCOME_ENGAGEMENT', status: 'ACTIVE', reach: '523247', impressions: '868587', frequency: '1.659994', amount_spent: 'SGD975.63' },
+  { id: '120251328719970319', name: 'brand_eng_sale_pty_thodiacamp_KV_b2c_0726_0826', objective: 'OUTCOME_ENGAGEMENT', status: 'ACTIVE', reach: '85692', impressions: '214760', frequency: '2.506185', amount_spent: 'SGD267.19' },
+  { id: '120251321695200319', name: 'brand_reach_pty_thodiacamp_b2c_0726_0826', objective: 'OUTCOME_AWARENESS', status: 'ACTIVE', reach: '918671', impressions: '4224513', frequency: '4.598505', amount_spent: 'SGD2,238.37' },
+  { id: '120251297310390319', name: 'brand_eng_sale_pty_thodiacamp_b2c_quan12_0726_0826', objective: 'OUTCOME_ENGAGEMENT', status: 'ACTIVE', reach: '321878', impressions: '773946', frequency: '2.40447', amount_spent: 'SGD923.68' },
+  { id: '120251448019740319', name: 'brand_reach_sale_pty_thodiacamp_exclude_fanengaged_b2c_hcm_0726_0826', objective: 'OUTCOME_AWARENESS', status: 'PAUSED', reach: '1167533', impressions: '2576427', frequency: '2.206727', amount_spent: 'SGD857.06' },
+  { id: '120251321467150319', name: 'brand_eng_pty_thodiacamp_b2b_0726_0826', objective: 'OUTCOME_ENGAGEMENT', status: 'ACTIVE', reach: '70136', impressions: '135499', frequency: '1.931947', amount_spent: 'SGD2.90' },
+  { id: '120250905291160319', name: 'brand_eng_sale_pty_b2c_0726', objective: 'OUTCOME_ENGAGEMENT', status: 'ACTIVE', reach: '685021', impressions: '1315004', frequency: '1.919655', amount_spent: 'SGD15.00' },
+];
+// fetchMeta(1) -- bản gốc trả về 1 dòng/campaign/ngày (148 dòng); renderImpressionTrend()/buildChannelDailySeries()
+// chỉ CỘNG DỒN impressions/reach theo ngày (byDate[metaDateToISO(r.date_start)] += num(r[metric])) nên gộp sẵn
+// thành 1 dòng TỔNG/ngày (đã cộng đúng cả 8 campaign ở trên, verify tổng khớp SUM từng ngày từ data thật) --
+// giảm 148 dòng xuống 35 dòng mà kết quả hiển thị y hệt (không mất độ chính xác của 2 chart dùng data này).
+const META_STATIC_DAILY_TOTALS = [
+  { date_start: '2026-07-01', impressions: 51468, reach: 48705 },
+  { date_start: '2026-07-02', impressions: 47968, reach: 42811 },
+  { date_start: '2026-07-03', impressions: 47800, reach: 43910 },
+  { date_start: '2026-07-04', impressions: 118569, reach: 108458 },
+  { date_start: '2026-07-05', impressions: 76512, reach: 62782 },
+  { date_start: '2026-07-06', impressions: 60517, reach: 52355 },
+  { date_start: '2026-07-07', impressions: 49706, reach: 45608 },
+  { date_start: '2026-07-08', impressions: 48819, reach: 44243 },
+  { date_start: '2026-07-09', impressions: 53637, reach: 43464 },
+  { date_start: '2026-07-10', impressions: 75915, reach: 54333 },
+  { date_start: '2026-07-11', impressions: 69781, reach: 49403 },
+  { date_start: '2026-07-12', impressions: 55137, reach: 39804 },
+  { date_start: '2026-07-13', impressions: 72003, reach: 48721 },
+  { date_start: '2026-07-14', impressions: 255422, reach: 193914 },
+  { date_start: '2026-07-15', impressions: 222789, reach: 178835 },
+  { date_start: '2026-07-16', impressions: 240235, reach: 186761 },
+  { date_start: '2026-07-17', impressions: 261179, reach: 202294 },
+  { date_start: '2026-07-18', impressions: 281824, reach: 212324 },
+  { date_start: '2026-07-19', impressions: 300589, reach: 224702 },
+  { date_start: '2026-07-20', impressions: 364139, reach: 297186 },
+  { date_start: '2026-07-21', impressions: 324799, reach: 272875 },
+  { date_start: '2026-07-22', impressions: 248803, reach: 206984 },
+  { date_start: '2026-07-23', impressions: 299488, reach: 229596 },
+  { date_start: '2026-07-24', impressions: 311011, reach: 242542 },
+  { date_start: '2026-07-25', impressions: 346688, reach: 265498 },
+  { date_start: '2026-07-26', impressions: 322084, reach: 242939 },
+  { date_start: '2026-07-27', impressions: 626581, reach: 549037 },
+  { date_start: '2026-07-28', impressions: 550859, reach: 478719 },
+  { date_start: '2026-07-29', impressions: 594442, reach: 524891 },
+  { date_start: '2026-07-30', impressions: 516147, reach: 448639 },
+  { date_start: '2026-07-31', impressions: 551237, reach: 479236 },
+  { date_start: '2026-08-01', impressions: 530754, reach: 446567 },
+  { date_start: '2026-08-02', impressions: 688837, reach: 607507 },
+  { date_start: '2026-08-03', impressions: 616738, reach: 548789 },
+  { date_start: '2026-08-04', impressions: 589648, reach: 509050 },
+];
+async function fetchMeta(timeIncrement) {
+  // SNAPSHOT: trước đây gọi callTool('...ads_get_ad_entities') tới Meta Ads API -- BuilderOS không có cầu nối
+  // live cho Meta nên đổi sang đọc mảng tĩnh đã fetch sẵn lúc chốt snapshot (xem SNAPSHOT_FROZEN_AT ở trên).
+  return timeIncrement ? META_STATIC_DAILY_TOTALS : META_STATIC_NOINC;
+}
+
+async function loadMetaSection() {
+  const body = document.getElementById('metaBodyFB');
+  const status = document.getElementById('metaStatus');
+  try {
+    const rows = await fetchMeta(null);
+    body.innerHTML = '';
+    let totalImp = 0, totalReach = 0, totalSpendSGD = 0;
+    // FIX 2026-07-31 (theo Lox): Impression dùng để tính Target/on-off-track của Reach giờ cũng CỘNG DỒN
+    // theo cùng 2 campaign RF_REACH_CAMPAIGN_NAMES (trước đó chỉ lấy Impression của 1 campaign REACH_CAMPAIGN_NAME).
+    let rfImpressionSum = 0, rfReachSum = 0, rfMatched = false;
+    rows.forEach(c => {
+      const imp = num(c.impressions) || 0;
+      const reach = num(c.reach) || 0;
+      const spend = num((c.amount_spent||'').replace('SGD','')) || 0;
+      totalImp += imp; totalReach += reach; totalSpendSGD += spend;
+      if (RF_REACH_CAMPAIGN_NAMES.includes(c.name)) { rfImpressionSum += imp; rfReachSum += reach; rfMatched = true; }
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${statusDot(c.status === 'ACTIVE', c.status)}${c.name}</td><td>${c.objective}</td><td class="num">${fmt(imp)}</td>
+        <td class="num">${fmt(reach)}</td><td class="num">${fmt2(num(c.frequency))}</td>
+        <td class="num">${fmt2(spend)}</td><td class="num">${fmt(spend*FX_SGD_VND)}</td>`;
+      body.appendChild(tr);
+    });
+    const trTotal = document.createElement('tr');
+    trTotal.className = 'total-row';
+    trTotal.innerHTML = `<td>TỔNG Facebook (${rows.length} campaigns)</td><td>—</td><td class="num">${fmt(totalImp)}</td>
+      <td class="num">${fmt(totalReach)}</td><td class="num">—</td>
+      <td class="num">${fmt2(totalSpendSGD)}</td><td class="num">${fmt(totalSpendSGD*FX_SGD_VND)}</td>`;
+    body.appendChild(trTotal);
+    status.textContent = `SNAPSHOT (chốt ${SNAPSHOT_FROZEN_AT}) · account ${AD_ACCOUNT_ID} · ${CAMPAIGN_START} → 2026-08-04`;
+    const rfImpression = rfMatched ? rfImpressionSum : null;
+    const rfReach = rfMatched ? rfReachSum : null;
+    return { totalImp, totalReach, totalSpendSGD, totalSpendVND: totalSpendSGD * FX_SGD_VND, rfImpression, rfReach };
+  } catch (e) {
+    body.innerHTML = `<tr><td colspan="7"><div class="err">Lỗi pull Meta Ads: ${e.message}</div></td></tr>`;
+    return null;
+  }
+}
+
+// ---------- TikTok Ads — Google Sheet sync (2026-08-04, thay Supermetrics đã hết hạn free trial) ----------
+// Apps Script chạy TRONG sheet riêng (dùng TikTok Business API access_token của Lox) tự fetch report +
+// ghi vào sheet mỗi ngày 6h sáng -> dashboard đọc sheet này LIVE mỗi lần Refresh, giống hệt cơ chế đang
+// dùng cho Paid Link/Adtima (read_file_content + parse markdown table), không nhúng data tĩnh.
+// Giới hạn đã biết: sheet không có cột Campaign status (Reports API không trả field này ở mức basic) nên
+// bỏ luôn status-dot ACTIVE/PAUSE — hiện "LIVE" chung cho mọi campaign có data. Cost đã là USD.
+const TIKTOK_SHEET_ID = '1Nd8ft4KILE0BFrBaBinG53GGXgwt2nDIAOwLWvTSomg';
+
+function parseTiktokDailyRows(text) {
+  const rows = parseMdRows(text);
+  const headerIdx = rows.findIndex(r => r.includes('Date') && r.includes('Campaign name'));
+  if (headerIdx === -1) return [];
+  const header = rows[headerIdx];
+  const idx = (name) => header.indexOf(name);
+  const out = [];
+  for (const r of rows.slice(headerIdx + 1)) {
+    const rawDate = (r[idx('Date')] || '').trim();
+    const m = rawDate.match(/^(\d{4}-\d{2}-\d{2})/); // Apps Script tự thêm " 0:00:00" vào sau ngày, bỏ đi
+    if (!m) continue; // bỏ dòng trống / dòng "Last synced: ..."
+    out.push({
+      date: m[1],
+      campaign: (r[idx('Campaign name')] || '').trim(),
+      impressions: Number(r[idx('Impressions')]) || 0,
+      reach: Number(r[idx('Reach')]) || 0,
+      videoViews: Number(r[idx('Video views')]) || 0,
+      cost: Number(r[idx('Cost (USD)')]) || 0,
+    });
+  }
+  return out;
+}
+
+let tiktokRawRowsCache = [];
+// SNAPSHOT: raw markdown fetch 1 lần lúc chốt (04/08/2026, xem SNAPSHOT_FROZEN_AT ở nchunk4) từ đúng
+// TIKTOK_SHEET_ID -- giữ nguyên parseTiktokDailyRows() để parse y hệt logic gốc, chỉ tĩnh hoá bước fetch.
+const TIKTOK_STATIC_TEXT = `
+
+|  |  |  |  |  |  |
+| :-: | :-: | :-: | :-: | :-: | :-: |
+| Date | Campaign name | Impressions | Reach | Video views | Cost (USD) |
+| 2026-07-07 0:00:00 | brand_reach_pty_thodiacamp_0726 | 33851 | 33293 | 33513 | 8.23 |
+| 2026-07-08 0:00:00 | brand_reach_pty_thodiacamp_0726 | 88916 | 85854 | 88075 | 20.56 |
+| 2026-07-09 0:00:00 | brand_reach_pty_thodiacamp_0726 | 81201 | 78859 | 80510 | 21.09 |
+| 2026-07-10 0:00:00 | brand_reach_pty_thodiacamp_0726 | 63897 | 46522 | 63332 | 15.64 |
+| 2026-07-11 0:00:00 | brand_reach_pty_thodiacamp_0726 | 95537 | 65361 | 95027 | 20.91 |
+| 2026-07-12 0:00:00 | brand_reach_pty_thodiacamp_0726 | 65369 | 47222 | 64998 | 13.42 |
+| 2026-07-13 0:00:00 | brand_reach_pty_thodiacamp_0726 | 713 | 684 | 706 | 0.11 |
+| 2026-07-14 0:00:00 | brand_reach_pty_thodiacamp_0726 | 2 | 2 | 2 | 0 |
+| 2026-07-14 0:00:00 | brand_videoviews_pty_thodiacamp_0726_0826. | 108 | 108 | 108 | 0.04 |
+| 2026-07-15 0:00:00 | brand_reach_pty_thodiacamp_0726 | 0 | 0 | 0 | 0 |
+| 2026-07-15 0:00:00 | brand_videoviews_pty_thodiacamp_0726_0826. | 0 | 0 | 0 | 0 |
+| 2026-07-16 0:00:00 | brand_videoviews_pty_thodiacamp_0726_0826. | 0 | 0 | 0 | 0 |
+| 2026-07-16 0:00:00 | brand_reach_pty_thodiacamp_0726 | 0 | 0 | 0 | 0 |
+| 2026-07-17 0:00:00 | brand_reach_pty_thodiacamp_0726 | 0 | 0 | 0 | 0 |
+| 2026-07-17 0:00:00 | brand_videoviews_pty_thodiacamp_0726_0826. | 0 | 0 | 0 | 0 |
+| 2026-07-18 0:00:00 | brand_videoviews_pty_thodiacamp_0726_0826. | 0 | 0 | 0 | 0 |
+| 2026-07-18 0:00:00 | brand_reach_pty_thodiacamp_0726 | 0 | 0 | 0 | 0 |
+| 2026-07-19 0:00:00 | brand_reach_pty_thodiacamp_0726 | 0 | 0 | 0 | 0 |
+| 2026-07-20 0:00:00 | brand_reach_pty_thodiacamp_0726 | 0 | 0 | 0 | 0 |
+| 2026-07-20 0:00:00 | brand_videoviews_pty_thodiacamp_0726_0826. | 0 | 0 | 0 | 0 |
+| 2026-07-21 0:00:00 | brand_reach_pty_thodiacamp_0726 | 0 | 0 | 0 | 0 |
+| 2026-07-22 0:00:00 | brand_reach_pty_thodiacamp_0726 | 0 | 0 | 0 | 0 |
+| 2026-07-23 0:00:00 | brand_reach_pty_thodiacamp_0726 | 0 | 0 | 0 | 0 |
+| 2026-07-23 0:00:00 | brand_videoviews_pty_thodiacamp_0726_0826. | 0 | 0 | 0 | 0 |
+| 2026-07-24 0:00:00 | brand_reach_pty_thodiacamp_0726 | 0 | 0 | 0 | 0 |
+| 2026-07-24 0:00:00 | brand_videoviews_pty_thodiacamp_0726_0826. | 0 | 0 | 0 | 0 |
+| 2026-07-25 0:00:00 | brand_reach_pty_thodiacamp_0726 | 0 | 0 | 0 | 0 |
+| 2026-07-26 0:00:00 | brand_reach_pty_thodiacamp_0726 | 0 | 0 | 0 | 0 |
+| 2026-07-27 0:00:00 | brand_reach_pty_thodiacamp_0726 | 0 | 0 | 0 | 0 |
+| 2026-07-27 0:00:00 | brand_videoviews_pty_thodiacamp_0726_0826. | 0 | 0 | 0 | 0 |
+| 2026-07-28 0:00:00 | brand_reach_pty_thodiacamp_0726 | 0 | 0 | 0 | 0 |
+| 2026-07-28 0:00:00 | brand_videoviews_pty_thodiacamp_0726_0826. | 0 | 0 | 0 | 0 |
+| 2026-07-29 0:00:00 | brand_reach_pty_thodiacamp_0726 | 0 | 0 | 0 | 0 |
+| 2026-07-29 0:00:00 | brand_videoviews_pty_thodiacamp_0726_0826. | 0 | 0 | 0 | 0 |
+| 2026-07-30 0:00:00 | brand_videoviews_pty_thodiacamp_0726_0826. | 0 | 0 | 0 | 0 |
+| 2026-07-30 0:00:00 | brand_reach_pty_thodiacamp_0726 | 0 | 0 | 0 | 0 |
+| 2026-07-31 0:00:00 | brand_videoviews_pty_thodiacamp_0726_0826. | 0 | 0 | 0 | 0 |
+| 2026-07-31 0:00:00 | brand_reach_pty_thodiacamp_0726 | 0 | 0 | 0 | 0 |
+| 2026-08-01 0:00:00 | brand_reach_pty_thodiacamp_0726 | 0 | 0 | 0 | 0 |
+| 2026-08-02 0:00:00 | brand_reach_pty_thodiacamp_0726 | 0 | 0 | 0 | 0 |
+| 2026-08-02 0:00:00 | brand_videoviews_pty_thodiacamp_0726_0826. | 0 | 0 | 0 | 0 |
+| 2026-08-03 0:00:00 | brand_reach_pty_thodiacamp_0726 | 0 | 0 | 0 | 0 |
+| 2026-08-03 0:00:00 | brand_videoviews_pty_thodiacamp_0726_0826. | 0 | 0 | 0 | 0 |
+| 2026-08-04 0:00:00 | brand_reach_pty_thodiacamp_0726 | 0 | 0 | 0 | 0 |
+|  |  |  |  |  |  |
+| Last synced: 06:49:35 5/8/2026 |  |  |  |  |  |`;
+async function fetchTiktok() {
+  // SNAPSHOT: trước đây gọi callTool('...read_file_content') tới Google Drive -- BuilderOS không có cầu nối
+  // live cho Google Sheets nên đổi sang parse thẳng text tĩnh đã fetch sẵn ở trên (parser gốc giữ nguyên).
+  return parseTiktokDailyRows(TIKTOK_STATIC_TEXT);
+}
+
+async function loadTiktokSection() {
+  const body = document.getElementById('metaBodyTiktok');
+  const status = document.getElementById('tiktokStatus');
+  try {
+    const rows = await fetchTiktok();
+    tiktokRawRowsCache = rows;
+    const byCampaign = {};
+    rows.forEach(r => {
+      if (!byCampaign[r.campaign]) byCampaign[r.campaign] = { impressions: 0, reach: 0, videoViews: 0, cost: 0 };
+      const c = byCampaign[r.campaign];
+      c.impressions += r.impressions; c.reach += r.reach; c.videoViews += r.videoViews; c.cost += r.cost;
+    });
+    body.innerHTML = '';
+    let totalImp = 0, totalReach = 0, totalViews = 0, totalCostUSD = 0;
+    Object.entries(byCampaign).forEach(([name, c]) => {
+      const freq = c.reach ? c.impressions / c.reach : null;
+      totalImp += c.impressions; totalReach += c.reach; totalViews += c.videoViews; totalCostUSD += c.cost;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${name} <span class="badge live">LIVE</span></td><td class="num">${fmt(c.impressions)}</td><td class="num">${fmt(c.reach)}</td>
+        <td class="num">${fmt2(freq)}</td><td class="num">${fmt(c.videoViews)}</td>
+        <td class="num">${fmt2(c.cost)}</td><td class="num">${fmt2(c.cost*FX_USD_SGD)}</td><td class="num">${fmt(c.cost*FX_USD_VND)}</td>`;
+      body.appendChild(tr);
+    });
+    if (!Object.keys(byCampaign).length) {
+      body.innerHTML = `<tr><td colspan="8" style="color:var(--ink-soft)">Chưa có data cho campaign chứa "${TIKTOK_CAMPAIGN_FILTER}"</td></tr>`;
+    } else {
+      const trTotal = document.createElement('tr');
+      trTotal.className = 'total-row';
+      trTotal.innerHTML = `<td>TỔNG Tiktok (${Object.keys(byCampaign).length} campaigns)</td><td class="num">${fmt(totalImp)}</td><td class="num">${fmt(totalReach)}</td>
+        <td class="num">—</td><td class="num">${fmt(totalViews)}</td>
+        <td class="num">${fmt2(totalCostUSD)}</td><td class="num">${fmt2(totalCostUSD*FX_USD_SGD)}</td><td class="num">${fmt(totalCostUSD*FX_USD_VND)}</td>`;
+      body.appendChild(trTotal);
+    }
+    status.textContent = `SNAPSHOT (chốt ${SNAPSHOT_FROZEN_AT}) (Google Sheet, Apps Script sync 6h sáng hàng ngày) · account ${TIKTOK_ACCOUNT_ID} · ${CAMPAIGN_START} → 2026-08-04 · quy đổi USD→SGD=${FX_USD_SGD}, USD→VND=${fmt(FX_USD_VND)} (rate tham khảo 15/07/2026)`;
+    return { totalImp, totalReach, totalViews, totalCostUSD, totalSpendSGD: totalCostUSD*FX_USD_SGD, totalSpendVND: totalCostUSD*FX_USD_VND };
+  } catch (e) {
+    body.innerHTML = `<tr><td colspan="8"><div class="err">Lỗi đọc sheet TikTok: ${e.message}</div></td></tr>`;
+    return null;
+  }
+}
+
+function renderAwarenessHighlight(metaData, tiktokData) {
+  const grid = document.getElementById('awarenessHighlight');
+  const impActual = (metaData ? metaData.totalImp : 0) + (tiktokData ? tiktokData.totalImp : 0);
+  const reachActual = (metaData ? metaData.totalReach : 0) + (tiktokData ? tiktokData.totalReach : 0);
+  const spendActual = (metaData ? metaData.totalSpendSGD : 0) + (tiktokData ? tiktokData.totalSpendSGD : 0);
+  const freqActual = reachActual ? (impActual / reachActual) : null;
+  const hasAny = metaData || tiktokData;
+  const tiles = [
+    { label: 'Total Impression', value: hasAny ? impActual : null, target: AWARENESS_TARGET.impression, fmtFn: fmt },
+    { label: 'Total Reach', value: hasAny ? reachActual : null, target: AWARENESS_TARGET.reach, fmtFn: fmt },
+    { label: 'Frequency', value: freqActual, target: AWARENESS_TARGET.frequency, fmtFn: fmt2 },
+    { label: 'Total budget spending', value: hasAny ? spendActual : null, target: AWARENESS_TARGET.budgetSGD, fmtFn: fmt2 },
+  ];
+  grid.innerHTML = '';
+  tiles.forEach(t => {
+    const div = document.createElement('div');
+    div.className = 'htile';
+    div.innerHTML = `<div class="hlabel">${t.label}</div><div class="hvalue">${t.value===null?'—':t.fmtFn(t.value)}</div>
+      <div class="htarget">Target: ${t.fmtFn(t.target)}${t.value!==null ? ' · '+fmt2(pct(t.value,t.target))+'% (chưa gồm Adtima)' : ''}</div>`;
+    grid.appendChild(div);
+  });
+}
+
+function budgetRowHTML(item, metaData, tiktokData) {
+  let actual = 0;
+  let badge = '<span class="badge dummy">DUMMY</span>';
+  if (item.actualKey === 'meta' && metaData) { actual = metaData.totalSpendVND; badge = '<span class="badge live">LIVE</span>'; }
+  if (item.actualKey === 'tiktok' && tiktokData) { actual = tiktokData.totalSpendVND; badge = '<span class="badge live">LIVE</span>'; }
+  // Manual/snapshot: số thật lấy tay từ Google Sheet "Est Budget" (không phải live pull) — xem note ở BUDGET_PLAN.
+  if (!item.actualKey && item.actual !== null && item.actual !== undefined) { actual = item.actual; badge = '<span class="badge snapshot">SHEET</span>'; }
+  const p = pct(actual, item.plan);
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td>${item.name} ${badge}</td><td class="num">${fmt(item.plan)}</td><td class="num">${fmt(actual)}</td>
+    <td class="num">${p===null?'—':fmt2(p)+'%'}</td>`;
+  return { tr, actual };
+}
+
+async function loadBudget(metaData, tiktokData) {
+  const body = document.getElementById('budgetBody');
+  body.innerHTML = '';
+  let totalPlan = 0, totalActual = 0;
+  BUDGET_PLAN.filter(i => i.includeInTotal !== false).forEach(item => {
+    const { tr, actual } = budgetRowHTML(item, metaData, tiktokData);
+    totalPlan += item.plan; totalActual += actual;
+    body.appendChild(tr);
+  });
+  const trTotal = document.createElement('tr');
+  trTotal.className = 'total-row';
+  const pTotal = pct(totalActual, totalPlan);
+  trTotal.innerHTML = `<td>TỔNG</td><td class="num">${fmt(totalPlan)}</td><td class="num">${fmt(totalActual)}</td>
+    <td class="num">${pTotal===null?'—':fmt2(pTotal)+'%'}</td>`;
+  body.appendChild(trTotal);
+
+  // Digital performance — bảng riêng
+  const digitalBody = document.getElementById('budgetDigitalBody');
+  digitalBody.innerHTML = '';
+  let dPlan = 0, dActual = 0;
+  BUDGET_PLAN.filter(i => i.includeInTotal === false).forEach(item => {
+    const { tr, actual } = budgetRowHTML(item, metaData, tiktokData);
+    dPlan += item.plan; dActual += actual;
+    digitalBody.appendChild(tr);
+  });
+  const dTotal = document.createElement('tr');
+  dTotal.className = 'total-row';
+  const pD = pct(dActual, dPlan);
+  dTotal.innerHTML = `<td>TỔNG Digital performance</td><td class="num">${fmt(dPlan)}</td><td class="num">${fmt(dActual)}</td>
+    <td class="num">${pD===null?'—':fmt2(pD)+'%'}</td>`;
+  digitalBody.appendChild(dTotal);
+
+  return { totalPlan, totalActual };
+}
+
+function renderKPIGrid(data) {
+  const grid = document.getElementById('kpiGrid');
+  grid.innerHTML = '';
+  const rf = data.meta || {};
+  const rfImp = rf.rfImpression, rfReach = rf.rfReach;
+  const pReach = rfReach !== null && rfReach !== undefined ? pct(rfReach, RF_TARGET.reach) : null;
+  const reachCard = document.createElement('div');
+  reachCard.className = 'kpi';
+  reachCard.innerHTML = `
+    <div class="label">Reach <span class="badge live">LIVE</span></div>
+    <div class="value">${rfReach!==null&&rfReach!==undefined ? fmt(rfReach) : '—'}</div>
+    <div class="target">Target: ${fmt(RF_TARGET.reach)} · Impression: ${rfImp!==null&&rfImp!==undefined?fmt(rfImp):'—'} / ${fmt(RF_TARGET.impression)}</div>
+    ${pReach!==null ? `<div class="progress-track"><div class="progress-fill ${pctClass(pReach)}" style="width:${Math.min(pReach,100)}%"></div></div><span class="pct-tag">${fmt2(pReach)}% target</span>` : ''}
+    ${trackHtml(WEEKLY_RF_IMPRESSION_TARGET, rfImp, 'Impression')}
+  `;
+  grid.appendChild(reachCard);
+
+  const oohActual = loadOOHActual();
+  const oohCard = document.createElement('div');
+  oohCard.className = 'kpi';
+  const planTotal = OOH_PLAN.L1 + OOH_PLAN.L2 + OOH_PLAN.L3;
+  const actualTotal = (Number(oohActual.L1)||0) + (Number(oohActual.L2)||0) + (Number(oohActual.L3)||0);
+  const pOOH = pct(actualTotal, planTotal);
+  oohCard.innerHTML = `
+    <div class="label">No. of OOH <span class="badge editable">EDITABLE</span></div>
+    <div class="value">${actualTotal} <span style="font-size:13px;color:var(--ink-soft);font-weight:600;">/ ${planTotal}</span></div>
+    <div class="progress-track"><div class="progress-fill ${pctClass(pOOH)}" style="width:${Math.min(pOOH,100)}%"></div></div>
+    <span class="pct-tag">${fmt2(pOOH)}% target</span>
+    <div class="ooh-row"><span>L1 (plan ${OOH_PLAN.L1})</span><input type="number" min="0" id="oohL1" value="${oohActual.L1}"></div>
+    <div class="ooh-row"><span>L2 (plan ${OOH_PLAN.L2})</span><input type="number" min="0" id="oohL2" value="${oohActual.L2}"></div>
+    <div class="ooh-row"><span>L3 (plan ${OOH_PLAN.L3})</span><input type="number" min="0" id="oohL3" value="${oohActual.L3}"></div>
+    ${trackHtml(WEEKLY_OOH_TARGET, actualTotal, 'slot')}
+  `;
+  grid.appendChild(oohCard);
+  ['L1','L2','L3'].forEach(k => {
+    oohCard.querySelector('#ooh'+k).addEventListener('change', (e) => {
+      const cur = loadOOHActual(); cur[k] = Number(e.target.value) || 0; saveOOHActual(cur); renderKPIGrid(data);
+    });
+  });
+
+  const cards = [
+    { label: 'Social buzz', value: TOTAL_SOCIAL_BUZZ, target: KPI_TARGETS.socialBuzz, tag: 'snapshot', fmtFn: fmt, weeklyTarget: WEEKLY_BUZZ_TARGET },
+    { label: 'Social engagement', value: TOTAL_SOCIAL_ENGAGEMENT, target: KPI_TARGETS.socialEngagement, tag: 'snapshot', fmtFn: fmt, weeklyTarget: WEEKLY_ENGAGEMENT_TARGET },
+    { label: '% Awareness coverage (Q12)', value: null, target: KPI_TARGETS.awarenessCoverage, tag: 'dummy', fmtFn: v=>v+'%' },
+    // FIX 2026-07-28 (theo Lox): dwlCampaign (loadCampaignDWL, campaign='tho_dia_camp' literal) đã lỗi thời/luôn=0
+    // vì tên campaign thật không còn khớp literal này -- đổi sang dùng dwlTotal (từ renderTrend(), cùng
+    // campaignVisitWhereClause() thống nhất toàn dashboard, đã gồm cả 3 UTM campaign digital mới thêm).
+    { label: 'DWL', value: data.dwlTotal !== undefined ? data.dwlTotal : 0, target: KPI_TARGETS.dwl, tag: 'live', fmtFn: fmt },
+    { label: 'App Install', value: (data.appInstallTotal !== undefined && data.appInstallTotal !== null) ? data.appInstallTotal : null, target: KPI_TARGETS.appInstall, tag: (data.appInstallTotal !== undefined && data.appInstallTotal !== null) ? 'live' : 'blocked', fmtFn: fmt },
+  ];
+  cards.forEach(c => {
+    const p = (c.value !== null && c.target) ? pct(c.value, c.target) : null;
+    const badgeMap = { blocked: '<span class="badge blocked">BLOCKED</span>', live: '<span class="badge live">LIVE</span>', snapshot: '<span class="badge snapshot">SNAPSHOT</span>' };
+    const badge = badgeMap[c.tag] || '<span class="badge dummy">DUMMY</span>';
+
+    const div = document.createElement('div');
+    div.className = 'kpi';
+    div.innerHTML = `
+      <div class="label">${c.label} ${badge}</div>
+      <div class="value">${c.value===null?'—':c.fmtFn(c.value)}</div>
+      ${c.target ? `<div class="target">Target: ${c.fmtFn(c.target)}</div>` : ''}
+      ${p!==null ? `<div class="progress-track"><div class="progress-fill ${pctClass(p)}" style="width:${Math.min(p,100)}%"></div></div><span class="pct-tag">${fmt2(p)}% target</span>` : ''}
+      ${c.weeklyTarget ? trackHtml(c.weeklyTarget, c.value) : ''}
+    `;
+    grid.appendChild(div);
+  });
+}
+
+let funnelChartInstance = null;
+function renderFunnel(data) {
+  const ctx = document.getElementById('funnelChart');
+  const impression = data.meta ? data.meta.totalImp : 0;
+  const reach = data.meta ? data.meta.totalReach : 0;
+  const visits = data.trafficTotal || 0;
+  const dwl = data.dwlTotal || 0;
+  const labels = ['Impression (FB)', 'Reach (FB)', 'Engagement*', 'Social buzz*', 'Visit web/app (trang mua bán Q12)', 'App Install*', 'DWL (trang mua bán Q12)'];
+  const values = [impression, reach, TOTAL_SOCIAL_ENGAGEMENT, TOTAL_SOCIAL_BUZZ, visits, 0, dwl];
+  const colors = ['#F5811F','#F5811F','#B8790A','#B8790A','#2563AA','#C23B3B','#1B8A5A'];
+  if (funnelChartInstance) funnelChartInstance.destroy();
+  funnelChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ data: values, backgroundColor: colors }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c)=>fmt(c.raw) } } },
+      scales: { x: { ticks: { callback: (v)=>fmt(v) } } } }
+  });
+}
+
+let impressionTrendChartInstance = null;
+let fbDailyRowsCache = [];
+async function renderImpressionTrend() {
+  const note = document.getElementById('impressionTrendNote');
+  try {
+    const daily = await fetchMeta(1);
+    fbDailyRowsCache = daily;
+    const byDate = {};
+    daily.forEach(r => { const d = metaDateToISO(r.date_start); byDate[d] = (byDate[d] || 0) + (num(r.impressions) || 0); });
+    const dates = [];
+    let cur = new Date(CAMPAIGN_START);
+    const end = new Date(CAMPAIGN_END);
+    while (cur <= end) { dates.push(cur.toISOString().slice(0,10)); cur.setDate(cur.getDate()+1); }
+    const actualSeries = dates.map(d => byDate[d] || null);
+    const targetSeries = dates.map(d => {
+      const wk = WEEKLY_IMPRESSION_TARGET.find(w => d >= w.start && d <= w.end);
+      return wk ? Math.round(wk.target / 7) : null;
+    });
+    const ctx = document.getElementById('impressionTrendChart');
+    if (impressionTrendChartInstance) impressionTrendChartInstance.destroy();
+    impressionTrendChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: { labels: dates, datasets: [
+        { label: 'Impression thực tế / ngày (Facebook)', data: actualSeries, borderColor: '#F5811F', backgroundColor: 'rgba(245,129,31,0.12)', fill: true, spanGaps: true, tension: 0.2, pointRadius: 2 },
+        { label: 'Target / ngày (TB tuần, FB+Tiktok+Adtima)', data: targetSeries, borderColor: '#5B6472', borderDash: [6,4], fill: false, stepped: true, pointRadius: 0 },
+      ]},
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { x: { ticks: { maxTicksLimit: 12 } } } }
+    });
+    const totalActual = Object.values(byDate).reduce((s,v)=>s+v,0);
+    note.textContent = `Live · tổng impression FB trong khoảng có data: ${fmt(totalActual)}`;
+  } catch (e) {
+    note.innerHTML = `<div class="err">Lỗi: ${e.message}</div>`;
+  }
+}
+
+let impressionTrendChartTiktokInstance = null;
+function renderImpressionTrendTiktok() {
+  const note = document.getElementById('impressionTrendNoteTiktok');
+  try {
+    const byDate = {};
+    tiktokRawRowsCache.forEach(r => { byDate[r.date] = (byDate[r.date] || 0) + (Number(r.impressions) || 0); });
+    const dates = [];
+    let cur = new Date(CAMPAIGN_START);
+    const end = new Date(CAMPAIGN_END);
+    while (cur <= end) { dates.push(cur.toISOString().slice(0,10)); cur.setDate(cur.getDate()+1); }
+    const actualSeries = dates.map(d => byDate[d] || null);
+    const targetSeries = dates.map(d => {
+      const wk = WEEKLY_IMPRESSION_TARGET_TIKTOK.find(w => d >= w.start && d <= w.end);
+      return wk ? Math.round(wk.target / 7) : null;
+    });
+    const ctx = document.getElementById('impressionTrendChartTiktok');
+    if (impressionTrendChartTiktokInstance) impressionTrendChartTiktokInstance.destroy();
+    impressionTrendChartTiktokInstance = new Chart(ctx, {
+      type: 'line',
+      data: { labels: dates, datasets: [
+        { label: 'Impression thực tế / ngày (Tiktok)', data: actualSeries, borderColor: CH_COLORS.Tiktok, backgroundColor: 'rgba(236,72,153,0.10)', fill: true, spanGaps: true, tension: 0.2, pointRadius: 2 },
+        { label: 'Target / ngày (TB tuần, riêng Tiktok)', data: targetSeries, borderColor: '#5B6472', borderDash: [6,4], fill: false, stepped: true, pointRadius: 0 },
+      ]},
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { x: { ticks: { maxTicksLimit: 12 } } } }
+    });
+    const totalActual = Object.values(byDate).reduce((s,v)=>s+v,0);
+    note.textContent = `Live · tổng impression Tiktok trong khoảng có data: ${fmt(totalActual)}`;
+  } catch (e) {
+    note.innerHTML = `<div class="err">Lỗi: ${e.message}</div>`;
+  }
+}
+
+
+// ---------- Impression & Reach theo ngày, theo từng kênh (1 chart cột chồng duy nhất) ----------
+let impressionByChannelChartInstance = null;
+let reachByChannelChartInstance = null;
+const CH_COLORS = { Facebook: '#0D3B66', Tiktok: '#EC4899', Adtima: '#7FB3D5' };
+
+function buildChannelDailySeries(dates, metric) {
+  const fb = {}, tk = {}, at = {};
+  fbDailyRowsCache.forEach(r => { const d = metaDateToISO(r.date_start); fb[d] = (fb[d] || 0) + (num(r[metric]) || 0); });
+  tiktokRawRowsCache.forEach(r => { tk[r.date] = (tk[r.date] || 0) + (Number(r[metric]) || 0); });
+  // FIX 2026-07-31 (theo Lox): Adtima giờ có số impression theo ngày (adtimaDailyRowsCache, từ loadAdtimaSection).
+  // Theo Lox: với Adtima, 1 impression = 1 reach -> dùng CHUNG 1 nguồn impression cho cả 2 metric impressions/reach.
+  adtimaDailyRowsCache.forEach(r => { at[r.date] = (at[r.date] || 0) + (Number(r.impression) || 0); });
+  return {
+    Facebook: dates.map(d => fb[d] || 0),
+    Tiktok: dates.map(d => tk[d] || 0),
+    Adtima: dates.map(d => at[d] || 0),
+  };
+}
+
+function channelVisible(ch) {
+  const el = document.getElementById('ch' + ch);
+  return el ? el.checked : true;
+}
+
+function renderOneChannelChart(canvasId, existingInstance, dates, seriesByChannel, title) {
+  const ctx = document.getElementById(canvasId);
+  if (existingInstance) existingInstance.destroy();
+  const datasets = Object.keys(seriesByChannel).map(ch => ({
+    label: ch, data: seriesByChannel[ch], backgroundColor: CH_COLORS[ch], stack: 'stack1', hidden: !channelVisible(ch),
+  }));
+  return new Chart(ctx, {
+    type: 'bar',
+    data: { labels: dates, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top' }, title: { display: true, text: title, align: 'start', font: { size: 12 } } },
+      scales: { x: { stacked: true, ticks: { maxTicksLimit: 12 } }, y: { stacked: true, beginAtZero: true } }
+    }
+  });
+}
+
+function renderChannelStackedCharts() {
+  const status = document.getElementById('channelStackStatus');
+  try {
+    const dates = [];
+    let cur = new Date(CAMPAIGN_START);
+    const end = new Date(CAMPAIGN_END);
+    while (cur <= end) { dates.push(cur.toISOString().slice(0,10)); cur.setDate(cur.getDate()+1); }
+    const impSeries = buildChannelDailySeries(dates, 'impressions');
+    const reachSeries = buildChannelDailySeries(dates, 'reach');
+    impressionByChannelChartInstance = renderOneChannelChart('impressionByChannelChart', impressionByChannelChartInstance, dates, impSeries, 'Impression theo ngày');
+    reachByChannelChartInstance = renderOneChannelChart('reachByChannelChart', reachByChannelChartInstance, dates, reachSeries, 'Reach theo ngày');
+    status.textContent = `Facebook, Tiktok & Adtima: live.`;
+  } catch (e) {
+    status.innerHTML = `<div class="err">Lỗi vẽ chart: ${e.message}</div>`;
+  }
+}
+['chFacebook','chTiktok','chAdtima'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('change', () => {
+    const ch = id.replace('ch','');
+    [impressionByChannelChartInstance, reachByChannelChartInstance].forEach(chart => {
+      if (!chart) return;
+      const ds = chart.data.datasets.find(d => d.label === ch);
+      if (ds) { ds.hidden = !document.getElementById(id).checked; chart.update(); }
+    });
+  });
+});
+
+// ---------- Filters (shared state) ----------
+const filtersT3 = { campaign: '', source: '', medium: '', content: '', page: '' };
+const filtersT4 = { campaign: '', source: '', medium: '', content: '' };
+
+function filterAndClause(alias, f) {
+  const a = alias ? alias + '.' : '';
+  const parts = [];
+  if (f.campaign) parts.push(`LOWER(${a}campaign) LIKE '%${esc(f.campaign.toLowerCase())}%'`);
+  if (f.source) parts.push(`LOWER(${a}source) LIKE '%${esc(f.source.toLowerCase())}%'`);
+  if (f.medium) parts.push(`LOWER(${a}medium) LIKE '%${esc(f.medium.toLowerCase())}%'`);
+  if (f.content) parts.push(`REGEXP_CONTAINS(LOWER(${a}landingScreenName), r'utm_content=[^&]*${esc(f.content.toLowerCase())}[^&]*')`);
+  return parts.length ? ' AND ' + parts.join(' AND ') : '';
+}
+
+let utmRawRows = [];
+const trafficDateRange = { from: '2026-07-01', to: '2026-08-31' };
+const dauDateRange = { from: '2026-07-01', to: '2026-08-31' };
+
+// ==== SNAPSHOT TĨNH (chốt 04/08/2026) ====
+// UTM breakdown: toàn bộ traffic Q12 có RẤT nhiều tổ hợp campaign/source/medium/content/page (không giới
+// hạn theo Thổ Địa) — giới hạn top 50 theo visits để đóng băng gọn, đủ dùng cho bảng search/sort.
+const SNAPSHOT_UTM_ROWS = [
+  {campaign:"digital_dau_pty_sell_land_hcm_pmax_adview_2025",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-dat-quan-12-tp-ho-chi-minh",visits:21914,users:21041},
+  {campaign:"(none)",source:"(direct)",medium:"(none)",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh",visits:7513,users:4347},
+  {campaign:"(none)",source:"(direct)",medium:"(none)",content:null,page_slug:"mua-ban-dat-quan-12-tp-ho-chi-minh",visits:7429,users:1339},
+  {campaign:"digital_dau_pty_sell_houses_q12_pmax_lead_2026",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh",visits:1599,users:1388},
+  {campaign:"digital_dau_pty_sell_houses_hcm_pmax_lead_2026",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh",visits:1480,users:1391},
+  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh",visits:1472,users:739},
+  {campaign:"(none)",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh",visits:977,users:775},
+  {campaign:"(none)",source:"(direct)",medium:"(none)",content:null,page_slug:"mua-ban-can-ho-chung-cu-quan-12-tp-ho-chi-minh",visits:735,users:336},
+  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-can-ho-chung-cu-quan-12-tp-ho-chi-minh",visits:452,users:191},
+  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-dat-quan-12-tp-ho-chi-minh",visits:433,users:258},
+  {campaign:"digital_dau_pty_sell_houses_hcm_dsa_lead_2025",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh",visits:429,users:253},
+  {campaign:"(none)",source:"(direct)",medium:"(none)",content:null,page_slug:"mua-ban-nha-dat-phuong-thanh-xuan-quan-12-tp-ho-chi-minh",visits:320,users:315},
+  {campaign:"digital_dau_pty_sell_vn_pmax_adview_2026",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh",visits:319,users:240},
+  {campaign:"(none)",source:"(direct)",medium:"(none)",content:null,page_slug:"mua-ban-nha-dat-phuong-thanh-loc-quan-12-tp-ho-chi-minh",visits:309,users:306},
+  {campaign:"zalo",source:"zalo",medium:"zalo",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh",visits:293,users:177},
+  {campaign:"(none)",source:"(direct)",medium:"(none)",content:null,page_slug:"mua-ban-bat-dong-san-quan-12-tp-ho-chi-minh",visits:202,users:100},
+  {campaign:"tho_dia_camp",source:"adtima",medium:"social",content:"media_block_znews",page_slug:"mua-ban-bat-dong-san-quan-12-tp-ho-chi-minh",visits:170,users:134},
+  {campaign:"digital_dau_pty_sell_vn_pmax_adview_2026",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-can-ho-chung-cu-quan-12-tp-ho-chi-minh",visits:154,users:98},
+  {campaign:"Share_ad_via_iOS",source:"ad_view",medium:"share_buttons",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh",visits:152,users:75},
+  {campaign:"digital_dau_pty_sell_houses_hcm_dsa_lead_2025",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh-gia-duoi-1-ty-sdpr1",visits:152,users:93},
+  {campaign:"tho_dia_camp",source:"banner",medium:"floatingbutton",content:null,page_slug:"mua-ban-bat-dong-san-quan-12-tp-ho-chi-minh",visits:148,users:97},
+  {campaign:"digital_dau_pty_sell_land_hcm_pmax_lead_2026",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-dat-quan-12-tp-ho-chi-minh",visits:139,users:125},
+  {campaign:"digital_dau_pty_sell_vn_pmax_adview_2026",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-dat-quan-12-tp-ho-chi-minh",visits:134,users:86},
+  {campaign:"digital_dau_pty_sell_houses_hcm_dsa_lead_2025",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh-gia-tu-1-ty-den-2-ty-sdpr2",visits:106,users:75},
+  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh-gia-duoi-1-ty-sdpr1",visits:105,users:49},
+  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-bat-dong-san-quan-12-tp-ho-chi-minh",visits:100,users:59},
+  {campaign:"digital_dau_pty_sell_apartment_hcm_dsa_lead_2025",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-can-ho-chung-cu-quan-12-tp-ho-chi-minh",visits:97,users:67},
+  {campaign:"digital_dau_pty_sell_houses_hcm_dsa_lead_2025",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-phuong-an-phu-dong-quan-12-tp-ho-chi-minh",visits:87,users:54},
+  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh-gia-tu-1-ty-den-2-ty-sdpr2",visits:83,users:33},
+  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-nha-dat-phuong-tan-thoi-nhat-quan-12-tp-ho-chi-minh",visits:79,users:46},
+  {campaign:"digital_dau_pty_sell_houses_q12_pmax_lead_2026",source:"google",medium:"pmax",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh",visits:79,users:53},
+  {campaign:"digital_dau_pty_sell_houses_hcm_dsa_lead_2025",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-phuong-tan-thoi-nhat-quan-12-tp-ho-chi-minh",visits:74,users:41},
+  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-nha-dat-phuong-tan-thoi-hiep-quan-12-tp-ho-chi-minh",visits:73,users:33},
+  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-nha-dat-phuong-dong-hung-thuan-quan-12-tp-ho-chi-minh",visits:70,users:48},
+  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-nha-dat-phuong-an-phu-dong-quan-12-tp-ho-chi-minh",visits:69,users:46},
+  {campaign:"digital_dau_pty_sell_vn_pmax_adview_2026",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-dat-phuong-an-phu-dong-quan-12-tp-ho-chi-minh",visits:68,users:49},
+  {campaign:"digital_dau_pty_sell_apartment_hcm_pmax_lead_2026",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-can-ho-chung-cu-quan-12-tp-ho-chi-minh",visits:64,users:28},
+  {campaign:"digital_dau_pty_sell_houses_hcm_dsa_lead_2025",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh-gia-tu-3-ty-den-5-ty-sdpr4",visits:61,users:24},
+  {campaign:"(none)",source:"(direct)",medium:"(none)",content:null,page_slug:"mua-ban-bat-dong-san-phuong-thoi-an-quan-12-tp-ho-chi-minh",visits:58,users:8},
+  {campaign:"(organic)",source:"bing",medium:"organic",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh",visits:57,users:25},
+  {campaign:"digital_dau_pty_sell_houses_hcm_dsa_lead_2025",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-phuong-dong-hung-thuan-quan-12-tp-ho-chi-minh",visits:57,users:34},
+  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-nha-dat-phuong-hiep-thanh-quan-12-tp-ho-chi-minh",visits:56,users:21},
+  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-nha-dat-phuong-thanh-loc-quan-12-tp-ho-chi-minh",visits:53,users:37},
+  {campaign:"(none)",source:"(direct)",medium:"(none)",content:null,page_slug:"mua-ban-bat-dong-san-phuong-hiep-thanh-quan-12-tp-ho-chi-minh",visits:53,users:18},
+  {campaign:"(none)",source:"(direct)",medium:"(none)",content:null,page_slug:"mua-ban-bat-dong-san-phuong-an-phu-dong-quan-12-tp-ho-chi-minh",visits:53,users:15},
+  {campaign:"zalo",source:"zalo",medium:"zalo",content:null,page_slug:"mua-ban-dat-quan-12-tp-ho-chi-minh",visits:49,users:31},
+  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-dat-phuong-an-phu-dong-quan-12-tp-ho-chi-minh",visits:49,users:33},
+  {campaign:"digital_dau_pty_sell_land_hcm_dsa_lead_2025",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-dat-phuong-an-phu-dong-quan-12-tp-ho-chi-minh",visits:48,users:35},
+  {campaign:"digital_dau_pty_sell_houses_hcm_dsa_lead_2025",source:"google",medium:"cpc",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh-gia-tu-2-ty-den-3-ty-sdpr3",visits:47,users:38},
+  {campaign:"(organic)",source:"google",medium:"organic",content:null,page_slug:"mua-ban-nha-dat-quan-12-tp-ho-chi-minh-gia-tu-2-ty-den-3-ty-sdpr3",visits:46,users:33},
+];
+const SNAPSHOT_TRAFFIC_TREND_TOTAL = [
+  {date:"2026-07-01",visits:2996},{date:"2026-07-02",visits:3888},{date:"2026-07-03",visits:2536},{date:"2026-07-04",visits:2183},
+  {date:"2026-07-05",visits:1268},{date:"2026-07-06",visits:2783},{date:"2026-07-07",visits:2657},{date:"2026-07-08",visits:2746},
+  {date:"2026-07-09",visits:2912},{date:"2026-07-10",visits:1944},{date:"2026-07-11",visits:1741},{date:"2026-07-12",visits:1014},
+  {date:"2026-07-13",visits:2615},{date:"2026-07-14",visits:2126},{date:"2026-07-15",visits:2325},{date:"2026-07-16",visits:2157},
+  {date:"2026-07-17",visits:654},{date:"2026-07-18",visits:710},{date:"2026-07-19",visits:542},{date:"2026-07-20",visits:603},
+  {date:"2026-07-21",visits:657},{date:"2026-07-22",visits:586},{date:"2026-07-23",visits:725},{date:"2026-07-24",visits:732},
+  {date:"2026-07-25",visits:814},{date:"2026-07-26",visits:658},{date:"2026-07-27",visits:634},{date:"2026-07-28",visits:1048},
+  {date:"2026-07-29",visits:1122},{date:"2026-07-30",visits:717},{date:"2026-07-31",visits:796},{date:"2026-08-01",visits:769},
+  {date:"2026-08-02",visits:929},{date:"2026-08-03",visits:759},{date:"2026-08-04",visits:849},
+];
+const SNAPSHOT_TRAFFIC_CAMPAIGN_HEADLINE = 2123;
+
+async function loadUTMBreakdown() {
+  return SNAPSHOT_UTM_ROWS;
+}
+
+function populateDatalists(rows) {
+  const map = { dlCampaign: 'campaign', dlSource: 'source', dlMedium: 'medium', dlContent: 'content' };
+  Object.entries(map).forEach(([dlId, key]) => {
+    const dl = document.getElementById(dlId);
+    dl.innerHTML = '';
+    Array.from(new Set(rows.map(r => r[key]).filter(v => v))).sort().forEach(v => {
+      const opt = document.createElement('option'); opt.value = v; dl.appendChild(opt);
+    });
+  });
+  const dlPage = document.getElementById('dlPage');
+  dlPage.innerHTML = '';
+  PAGES.forEach(p => { const opt = document.createElement('option'); opt.value = p.label; dlPage.appendChild(opt); });
+}
+
+let gridInstance = null;
+function renderUTMGrid(rows) {
+  const container = document.getElementById('utmTableContainer');
+  const f = filtersT3;
+  const filtered = rows.filter(r => {
+    const c = (r.campaign||'').toLowerCase(), s = (r.source||'').toLowerCase(), m = (r.medium||'').toLowerCase(), ct = (r.content||'').toLowerCase();
+    const pLabel = pageLabel(r.page_slug||'').toLowerCase();
+    return (!f.campaign || c.includes(f.campaign.toLowerCase())) &&
+      (!f.source || s.includes(f.source.toLowerCase())) &&
+      (!f.medium || m.includes(f.medium.toLowerCase())) &&
+      (!f.content || ct.includes(f.content.toLowerCase())) &&
+      (!f.page || pLabel.includes(f.page.toLowerCase()));
+  });
+  const data = filtered.map(r => [r.campaign || '(none)', r.source || '(none)', r.medium || '(none)', r.content || '—', pageLabel(r.page_slug) || '—', Number(r.visits), Number(r.users)]);
+  container.innerHTML = '';
+  gridInstance = new gridjs.Grid({
+    columns: ['Campaign', 'Source', 'Medium', 'Content', 'Trang', 'Visits', 'Users'],
+    data: data.length ? data : [['—','Không có dữ liệu khớp filter','—','—','—','—','—']],
+    sort: true, search: true, pagination: { limit: 15 },
+    style: { table: { fontSize: '12.5px' } }
+  }).render(container);
+}
+
+async function renderUTMTable() {
+  const status = document.getElementById('utmStatus');
+  utmRawRows = await loadUTMBreakdown();
+  populateDatalists(utmRawRows);
+  renderUTMGrid(utmRawRows);
+  const totalVisits = utmRawRows.reduce((s,r)=>s+Number(r.visits||0),0);
+  status.textContent = `SNAPSHOT (chốt 04/08/2026) · top ${utmRawRows.length} dòng theo visits (không phải toàn bộ) · tổng visits (top)=${fmt(totalVisits)}`;
+  return totalVisits;
+}
+
+let trafficTrendChartInstance = null;
+async function renderTrafficTrend() {
+  const status = document.getElementById('trafficTrendStatus');
+  const rows = SNAPSHOT_TRAFFIC_TREND_TOTAL;
+  const dates = rows.map(r => r.date);
+  const series = rows.map(r => r.visits);
+  const ctx = document.getElementById('trafficTrendChart');
+  if (trafficTrendChartInstance) trafficTrendChartInstance.destroy();
+  trafficTrendChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: { labels: dates, datasets: [{ label: 'Traffic — Tổng trang mua bán Q.12', data: series, borderColor: '#2563AA', backgroundColor: 'rgba(37,99,170,0.12)', fill: true, tension: 0.2, pointRadius: 1 }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${fmt(c.raw)} visits` } } },
+      scales: { x: { ticks: { maxTicksLimit: 12 } } } }
+  });
+  const totalVisits = series.reduce((s,v)=>s+v,0);
+  document.getElementById('trafficHeadline').textContent = fmt(totalVisits);
+  status.textContent = `SNAPSHOT (chốt 04/08/2026) · tổng visits = ${fmt(totalVisits)} · lưu ý: filter page/campaign/source/medium/content không áp dụng được trong bản snapshot tĩnh này, xem bản Cowork live để lọc`;
+  return totalVisits;
+}
+
+let campaignBreakdownChartInstance = null;
+let campaignBreakdownDim = 'source';
+const CAMPAIGN_BREAKDOWN_PALETTE = ['#0D3B66','#F5811F','#1B8A5A','#B8790A','#7A5AF8','#C23B3B','#2563AA','#111111','#9333EA','#0EA5A5'];
+const CAMPAIGN_BREAKDOWN_TOP_N = 9;
+
+async function renderCampaignBreakdownChart() {
+  const status = document.getElementById('campaignBreakdownStatus');
+  const ctx = document.getElementById('campaignBreakdownChart');
+  if (campaignBreakdownChartInstance) { campaignBreakdownChartInstance.destroy(); campaignBreakdownChartInstance = null; }
+  status.innerHTML = `<span style="color:var(--ink-soft);">Chưa đóng băng được trong snapshot này (data quá lớn) — xem bản Cowork live để có chart này.</span>`;
+}
+document.querySelectorAll('.dim-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.dim-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    campaignBreakdownDim = btn.dataset.dim;
+    renderCampaignBreakdownChart();
+  });
+});
+
+async function renderTrafficCampaignHeadline() {
+  const noteEl = document.getElementById('trafficCampaignNote');
+  const valEl = document.getElementById('trafficCampaignHeadline');
+  valEl.textContent = fmt(SNAPSHOT_TRAFFIC_CAMPAIGN_HEADLINE);
+  noteEl.textContent = 'SNAPSHOT (chốt 04/08/2026)';
+}
+
+// ==== SNAPSHOT TĨNH (2026-08-04) — data đóng băng, BuilderOS không có cầu nối live cho các nguồn này ====
+const SNAPSHOT_TREND_ROWS = [
+  {date:"2026-07-13",dau:1,dwl:1,lead:20},{date:"2026-07-14",dau:2,dwl:1,lead:29},{date:"2026-07-15",dau:1,dwl:1,lead:69},
+  {date:"2026-07-16",dau:1,dwl:0,lead:18},{date:"2026-07-17",dau:4,dwl:0,lead:49},{date:"2026-07-18",dau:8,dwl:1,lead:22},
+  {date:"2026-07-19",dau:6,dwl:4,lead:45},{date:"2026-07-20",dau:25,dwl:3,lead:47},{date:"2026-07-21",dau:31,dwl:1,lead:60},
+  {date:"2026-07-22",dau:23,dwl:2,lead:113},{date:"2026-07-23",dau:33,dwl:1,lead:32},{date:"2026-07-24",dau:22,dwl:1,lead:33},
+  {date:"2026-07-25",dau:63,dwl:5,lead:24},{date:"2026-07-26",dau:40,dwl:3,lead:116},{date:"2026-07-27",dau:49,dwl:6,lead:63},
+  {date:"2026-07-28",dau:411,dwl:43,lead:57},{date:"2026-07-29",dau:474,dwl:27,lead:60},{date:"2026-07-30",dau:102,dwl:12,lead:43},
+  {date:"2026-07-31",dau:172,dwl:13,lead:69},{date:"2026-08-01",dau:118,dwl:6,lead:102},{date:"2026-08-02",dau:211,dwl:15,lead:72},
+  {date:"2026-08-03",dau:102,dwl:7,lead:120},{date:"2026-08-04",dau:119,dwl:14,lead:74},
+];
+const SNAPSHOT_CAMPAIGN_DAU_MAU = { totalDau: 4856, totalDauWLead: 876 };
+const SNAPSHOT_APP_INSTALL_ROWS = [
+  {date:"2026-07-13",installs:1},{date:"2026-07-14",installs:1},{date:"2026-07-15",installs:1},{date:"2026-07-16",installs:0},
+  {date:"2026-07-17",installs:1},{date:"2026-07-18",installs:17},{date:"2026-07-19",installs:36},{date:"2026-07-20",installs:53},
+  {date:"2026-07-21",installs:63},{date:"2026-07-22",installs:154},{date:"2026-07-23",installs:284},{date:"2026-07-24",installs:308},
+  {date:"2026-07-25",installs:383},{date:"2026-07-26",installs:220},{date:"2026-07-27",installs:466},{date:"2026-07-28",installs:425},
+  {date:"2026-07-29",installs:434},{date:"2026-07-30",installs:419},{date:"2026-07-31",installs:426},{date:"2026-08-01",installs:374},
+  {date:"2026-08-02",installs:413},{date:"2026-08-03",installs:453},{date:"2026-08-04",installs:81},
+];
+const SNAPSHOT_GOOGLE_ADS_TOTALS = { impressions: 887252, clicks: 23341, installs: 3763, cost: 36745206.896251 };
+const SNAPSHOT_INSTALL_CONTRIB_ROWS = [
+  {date:"2026-07-13",grp:"Brand activities",installs:5},{date:"2026-07-14",grp:"Brand activities",installs:31},
+  {date:"2026-07-15",grp:"Brand activities",installs:46},{date:"2026-07-16",grp:"Brand activities",installs:39},
+  {date:"2026-07-17",grp:"Brand activities",installs:43},{date:"2026-07-18",grp:"Brand activities",installs:66},
+  {date:"2026-07-19",grp:"Brand activities",installs:60},{date:"2026-07-20",grp:"Brand activities",installs:51},
+  {date:"2026-07-21",grp:"Brand activities",installs:77},{date:"2026-07-22",grp:"Digital app install",installs:151},
+  {date:"2026-07-22",grp:"Brand activities",installs:56},{date:"2026-07-23",grp:"Brand activities",installs:62},
+  {date:"2026-07-23",grp:"Digital app install",installs:269},{date:"2026-07-24",grp:"Brand activities",installs:57},
+  {date:"2026-07-24",grp:"Digital app install",installs:309},{date:"2026-07-25",grp:"Digital app install",installs:382},
+  {date:"2026-07-25",grp:"Brand activities",installs:85},{date:"2026-07-26",grp:"Digital app install",installs:406},
+  {date:"2026-07-26",grp:"Brand activities",installs:89},{date:"2026-07-27",grp:"Digital app install",installs:415},
+  {date:"2026-07-27",grp:"Brand activities",installs:69},{date:"2026-07-28",grp:"Brand activities",installs:92},
+  {date:"2026-07-28",grp:"Digital app install",installs:344},{date:"2026-07-29",grp:"Digital app install",installs:379},
+  {date:"2026-07-29",grp:"Brand activities",installs:84},{date:"2026-07-30",grp:"Brand activities",installs:95},
+  {date:"2026-07-30",grp:"Digital app install",installs:386},{date:"2026-07-31",grp:"Digital app install",installs:361},
+  {date:"2026-07-31",grp:"Brand activities",installs:95},{date:"2026-08-01",grp:"Brand activities",installs:84},
+  {date:"2026-08-01",grp:"Digital app install",installs:298},{date:"2026-08-02",grp:"Digital app install",installs:318},
+  {date:"2026-08-02",grp:"Brand activities",installs:95},{date:"2026-08-03",grp:"Digital app install",installs:373},
+  {date:"2026-08-03",grp:"Brand activities",installs:106},{date:"2026-08-04",grp:"Digital app install",installs:347},
+  {date:"2026-08-04",grp:"Brand activities",installs:93},
+];
+const SNAPSHOT_INSTALL_BREAKDOWN_ROWS = [
+  {source:"google.adwords",medium:"ACI",campaign:"gg_growth_pty_app_android_install_app_maxinstall_thodia_bau_072126_HCM",content:null,installs:2430},
+  {source:"google.adwords",medium:"ACI",campaign:"gg_growth_pty_app_android_install_app_maxinstall_thodia_bau_072126_VN",content:null,installs:1852},
+  {source:"facebook.business",medium:"facebook",campaign:"brand_reach_pty_thodiacamp_b2c_0726_0826",content:"OUTCOME_AWARENESS",installs:570},
+  {source:"facebook.business",medium:"facebook",campaign:"brand_reach_sale_pty_thodiacamp_exclude_fanengaged_b2c_hcm_0726_0826",content:"OUTCOME_AWARENESS",installs:371},
+  {source:"facebook.business",medium:"facebook",campaign:"brand_eng_sale_pty_thodiacamp_b2c_exclude_quan12_0726_0826",content:"OUTCOME_ENGAGEMENT",installs:247},
+  {source:"facebook.business",medium:"facebook",campaign:"brand_eng_sale_pty_thodiacamp_b2c_quan12_0726_0826",content:"OUTCOME_ENGAGEMENT",installs:179},
+  {source:"facebook.business",medium:"facebook",campaign:"fb_growth_pty_app_android_install_app_pro_thodia_bau_072126_HCM_atc",content:"APP_INSTALLS",installs:148},
+  {source:"facebook.business",medium:"facebook",campaign:"fb_growth_pty_app_android_install_app_rtg_thodia_bau_072126_VN_atc",content:"APP_INSTALLS",installs:138},
+  {source:"facebook.business",medium:"facebook",campaign:"fb_growth_pty_app_android_install_app_pro_thodia_bau_072126_VN_atc",content:"APP_INSTALLS",installs:138},
+  {source:"facebook.business",medium:"facebook",campaign:"brand_eng_sale_pty_thodiacamp_b2c_0726_0826",content:"OUTCOME_ENGAGEMENT",installs:54},
+  {source:"facebook.business",medium:"facebook",campaign:"brand_reach_sale_pty_thodiacamp_only_fanengaged_b2c_hcm_0726_0826",content:"OUTCOME_AWARENESS",installs:40},
+  {source:"facebook.business",medium:"facebook",campaign:"brand_eng_sale_pty_thodiacamp_KV_b2c_0726_0826",content:"OUTCOME_ENGAGEMENT",installs:36},
+  {source:"ooh",medium:"growth_offline",campaign:"tho_dia_camp",content:"l2_1",installs:31},
+  {source:"facebook.business",medium:"facebook",campaign:"brand_eng_pty_thodiacamp_b2b_0726_0826",content:"OUTCOME_ENGAGEMENT",installs:21},
+  {source:"facebook.business",medium:"facebook",campaign:"brand_eng_sale_pty_thodiacamp_b2c_0726",content:"OUTCOME_ENGAGEMENT",installs:13},
+  {source:"facebook.business",medium:"facebook",campaign:"fb_growth_pty_app_android_install_app_rtg_thodiacamp_bau_072126_VN_atc",content:"APP_INSTALLS",installs:6},
+  {source:"facebook.business",medium:"threads",campaign:"fb_growth_pty_app_android_install_app_rtg_thodia_bau_072126_VN_atc",content:"APP_INSTALLS",installs:4},
+  {source:"facebook.business",medium:"instagram",campaign:"fb_growth_pty_app_android_install_app_rtg_thodia_bau_072126_VN_atc",content:"APP_INSTALLS",installs:4},
+  {source:"facebook.business",medium:"threads",campaign:"fb_growth_pty_app_android_install_app_pro_thodia_bau_072126_HCM_atc",content:"APP_INSTALLS",installs:4},
+  {source:"facebook.business",medium:"instagram",campaign:"fb_growth_pty_app_android_install_app_pro_thodia_bau_072126_VN_atc",content:"APP_INSTALLS",installs:3},
+  {source:"facebook.business",medium:"instagram",campaign:"fb_growth_pty_app_android_install_app_pro_thodia_bau_072126_HCM_atc",content:"APP_INSTALLS",installs:3},
+  {source:"banner",medium:"floatingbutton",campaign:"tho_dia_camp",content:null,installs:3},
+  {source:"facebook.business",medium:"threads",campaign:"fb_growth_pty_app_android_install_app_pro_thodia_bau_072126_VN_atc",content:"APP_INSTALLS",installs:3},
+  {source:"facebook.business",medium:"facebook",campaign:"fb_growth_pty_app_android_install_app_pro_thodiacamp_bau_072126_HCM_atc",content:"APP_INSTALLS",installs:3},
+  {source:"ooh",medium:"growth_offline",campaign:"tho_dia_camp",content:"l1_5",installs:3},
+  {source:"ooh",medium:"growth_offline",campaign:"tho_dia_camp",content:"l2_7",installs:2},
+  {source:"ooh",medium:"growth_offline",campaign:"tho_dia_camp",content:"l2_4",installs:2},
+  {source:"ooh",medium:"growth_offline",campaign:"tho_dia_camp",content:"l2_2",installs:2},
+  {source:"facebook.business",medium:"instagram",campaign:"brand_eng_sale_pty_thodiacamp_b2c_exclude_quan12_0726_0826",content:"OUTCOME_ENGAGEMENT",installs:2},
+  {source:"facebook.business",medium:"threads",campaign:"brand_eng_sale_pty_thodiacamp_b2c_quan12_0726_0826",content:"OUTCOME_ENGAGEMENT",installs:1},
+  {source:"ooh",medium:"growth_offline",campaign:"tho_dia_camp",content:"l2_6",installs:1},
+  {source:"facebook.business",medium:"instagram",campaign:"brand_eng_sale_pty_thodiacamp_b2c_quan12_0726_0826",content:"OUTCOME_ENGAGEMENT",installs:1},
+  {source:"ooh",medium:"growth_offline",campaign:"tho_dia_camp",content:"l3_2",installs:1},
+];
+
+let trendChartInstance = null;
+async function renderTrend() {
+  const status = document.getElementById('trendStatus');
+  try {
+    const rows = SNAPSHOT_TREND_ROWS;
+    const dates = rows.map(r => r.date);
+    const dauSeries = rows.map(r => Number(r.dau));
+    const dwlSeries = rows.map(r => Number(r.dwl));
+    const leadSeries = rows.map(r => Number(r.lead));
+    const ctx = document.getElementById('trendChart');
+    if (trendChartInstance) trendChartInstance.destroy();
+    trendChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: { labels: dates, datasets: [
+        { label: 'DAU (visits, trang mua bán Q12)', data: dauSeries, borderColor: '#F5811F', backgroundColor: 'rgba(245,129,31,0.12)', fill: true, tension: 0.25 },
+        { label: 'DWL (users có lead trong ngày)', data: dwlSeries, borderColor: '#2563AA', backgroundColor: 'rgba(37,99,170,0.12)', fill: true, tension: 0.25 },
+        { label: 'Lead (tổng số lượt lead trong ngày)', data: leadSeries, borderColor: '#1B8A5A', backgroundColor: 'rgba(27,138,90,0.10)', fill: true, tension: 0.25 },
+      ]},
+      options: { responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${fmt(c.raw)}` } } } }
+    });
+    const totalDau = dauSeries.reduce((s,v)=>s+v,0);
+    const totalDwl = dwlSeries.reduce((s,v)=>s+v,0);
+    const totalLead = leadSeries.reduce((s,v)=>s+v,0);
+    status.textContent = `SNAPSHOT (chốt 04/08/2026) · ${dates.length} ngày · tổng DAU=${fmt(totalDau)}, tổng DWL=${fmt(totalDwl)}, tổng Lead=${fmt(totalLead)}`;
+    renderDauHeadline(totalDau, totalDwl, totalLead);
+    return { totalDau, totalDwl, totalLead };
+  } catch (e) {
+    status.innerHTML = `<div class="err">Lỗi: ${e.message}</div>`;
+    renderDauHeadline(null, null, null);
+    return { totalDau: 0, totalDwl: 0, totalLead: 0 };
+  }
+}
+
+function renderDauHeadline(totalDau, totalDwl, totalLead, appInstallTotal) {
+  const grid = document.getElementById('dauHeadline');
+  const hasAppInstall = appInstallTotal !== undefined && appInstallTotal !== null;
+  const tiles = [
+    { label: 'DAU', value: totalDau, tag: 'live' },
+    { label: 'DWL', value: totalDwl, tag: 'live' },
+    { label: 'Lead', value: totalLead, tag: 'live', extra: 'Tổng số lượt lead (1 user có thể tạo nhiều lead)' },
+    { label: 'App Install', value: hasAppInstall ? appInstallTotal : null, tag: hasAppInstall ? 'live' : 'blocked',
+      extra: hasAppInstall ? 'Target: 20,200 · nguồn Airbridge (airbridge_raw_data_app_install, SUM install_devices)' : 'Target: 20,200 · cần Airbridge/Branch.io' },
+  ];
+  grid.innerHTML = tiles.map(t => {
+    const badge = t.tag === 'blocked' ? '<span class="badge blocked">BLOCKED</span>' : '<span class="badge snapshot">SNAPSHOT</span>';
+    return `<div class="htile"><div class="hlabel">${t.label} ${badge}</div><div class="hvalue">${t.value===null?'—':fmt(t.value)}</div>${t.extra?`<div class="htarget">${t.extra}</div>`:''}</div>`;
+  }).join('');
+}
+
+async function loadCampaignDWL() {
+  return 0;
+}
+
+async function loadCampaignDauMau() {
+  const el = document.getElementById('campaignDauMauNote');
+  const { totalDau, totalDauWLead } = SNAPSHOT_CAMPAIGN_DAU_MAU;
+  if (el) el.textContent = `Đối chiếu (bảng chuẩn campaign DAU/MAU, mtm_chotot_vertical_channel_campaign_dau_mau) · SNAPSHOT: DAU=${fmt(totalDau)} · DAU w Lead=${fmt(totalDauWLead)}`;
+  return { totalDau, totalDauWLead };
+}
+
+async function loadAppInstallData() {
+  const rows = SNAPSHOT_APP_INSTALL_ROWS;
+  const total = rows.reduce((s, r) => s + r.installs, 0);
+  renderAppInstallChart(rows);
+  return { rows, total };
+}
+
+let appInstallChartInstance = null;
+function renderAppInstallChart(rows) {
+  const ctx = document.getElementById('appInstallChart');
+  if (!ctx) return;
+  if (appInstallChartInstance) appInstallChartInstance.destroy();
+  appInstallChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: { labels: rows.map(r => r.date), datasets: [
+      { label: 'App Install (devices/ngày)', data: rows.map(r => r.installs), borderColor: '#7A5AF8', backgroundColor: 'transparent', fill: false, tension: 0.2, pointRadius: 1 },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${fmt(c.raw)}` } } },
+      scales: { x: { ticks: { maxTicksLimit: 12 } }, y: { beginAtZero: true } } }
+  });
+}
+
+async function loadGoogleAdsAppInstall() {
+  const status = document.getElementById('googleAdsAppInstallStatus');
+  const totals = SNAPSHOT_GOOGLE_ADS_TOTALS;
+  const grid = document.getElementById('googleAdsAppInstallGrid');
+  if (grid) grid.innerHTML = `
+    <div class="htile"><div class="hlabel">Impressions <span class="badge snapshot">SNAPSHOT</span></div><div class="hvalue">${fmt(totals.impressions)}</div></div>
+    <div class="htile"><div class="hlabel">Clicks <span class="badge snapshot">SNAPSHOT</span></div><div class="hvalue">${fmt(totals.clicks)}</div></div>
+    <div class="htile"><div class="hlabel">Installs <span class="badge snapshot">SNAPSHOT</span></div><div class="hvalue">${fmt(totals.installs)}</div></div>
+    <div class="htile"><div class="hlabel">Cost <span class="badge snapshot">SNAPSHOT</span></div><div class="hvalue">${fmt(totals.cost)}</div></div>
+  `;
+  if (status) status.textContent = `SNAPSHOT (chốt 04/08/2026) · campaign chứa "tho_dia"/"thodia" (không có reach/engagement)`;
+  return totals;
+}
+
+async function loadInstallContribution() {
+  const status = document.getElementById('contribStatus');
+  const rows = SNAPSHOT_INSTALL_CONTRIB_ROWS;
+  const digitalByDate = {}, brandByDate = {};
+  let digitalTotal = 0, brandTotal = 0;
+  rows.forEach(r => {
+    const v = Number(r.installs) || 0;
+    if (r.grp === 'Digital app install') { digitalByDate[r.date] = (digitalByDate[r.date] || 0) + v; digitalTotal += v; }
+    else { brandByDate[r.date] = (brandByDate[r.date] || 0) + v; brandTotal += v; }
+  });
+  const dates = Array.from(new Set(rows.map(r => r.date))).sort();
+  const grandTotal = digitalTotal + brandTotal;
+  const pct = (v) => grandTotal ? fmt2(v / grandTotal * 100) + '% tổng install' : '—';
+  const grid = document.getElementById('contribHeadline');
+  if (grid) grid.innerHTML = `
+    <div class="htile"><div class="hlabel">Digital app install <span class="badge snapshot">SNAPSHOT</span></div><div class="hvalue">${fmt(digitalTotal)}</div><div class="htarget">${pct(digitalTotal)}</div></div>
+    <div class="htile"><div class="hlabel">Brand activities <span class="badge snapshot">SNAPSHOT</span></div><div class="hvalue">${fmt(brandTotal)}</div><div class="htarget">${pct(brandTotal)}</div></div>
+  `;
+  renderContribChart(dates, dates.map(d => digitalByDate[d] || 0), dates.map(d => brandByDate[d] || 0));
+  if (status) status.textContent = `SNAPSHOT (chốt 04/08/2026) · ${dates.length} ngày · tổng ${fmt(grandTotal)} install (Digital ${fmt(digitalTotal)} · Brand ${fmt(brandTotal)})`;
+}
+
+let contribChartInstance = null;
+function renderContribChart(dates, digitalSeries, brandSeries) {
+  const ctx = document.getElementById('contribChart');
+  if (!ctx) return;
+  if (contribChartInstance) contribChartInstance.destroy();
+  contribChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: dates, datasets: [
+      { label: 'Digital app install', data: digitalSeries, backgroundColor: '#2563AA', stack: 's1' },
+      { label: 'Brand activities', data: brandSeries, backgroundColor: '#F5811F', stack: 's1' },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${fmt(c.raw)}` } } },
+      scales: { x: { stacked: true, ticks: { maxTicksLimit: 12 } }, y: { stacked: true, beginAtZero: true } } }
+  });
+}
+
+async function loadInstallBreakdownTable() {
+  const status = document.getElementById('installTableStatus');
+  const container = document.getElementById('installTableContainer');
+  const rows = SNAPSHOT_INSTALL_BREAKDOWN_ROWS;
+  const data = rows.map(r => [r.source || '(none)', r.medium || '(none)', r.campaign || '(none)', r.content || '(none)', Number(r.installs) || 0]);
+  container.innerHTML = '';
+  new gridjs.Grid({
+    columns: ['Source (utm_source)', 'Medium (utm_medium)', 'Campaign (utm_campaign)', 'Content (utm_content)', 'Install'],
+    data: data.length ? data : [['—', 'Không có data', '—', '—', '—']],
+    sort: true, search: true, pagination: { limit: 15 },
+    style: { table: { fontSize: '12.5px' } },
+  }).render(container);
+  const total = rows.reduce((s, r) => s + (Number(r.installs) || 0), 0);
+  const campaignCount = new Set(rows.map(r => r.campaign)).size;
+  if (status) status.textContent = `SNAPSHOT (chốt 04/08/2026) · ${campaignCount} campaign · tổng ${fmt(total)} install`;
+}
+
+let channelChartInstance = null;
+let channelRawRows = [];
+let channelMetric = 'dau';
+const CHANNEL_COLORS = ['#F5811F','#2563AA','#1B8A5A','#B8790A','#C23B3B','#7A5AF8','#0EA5A5','#9333EA'];
+
+const SNAPSHOT_CHANNEL_GROUPING_ROWS = [
+  {date:"2026-07-13",ch:"(Other)",dau:1,dwl:1},{date:"2026-07-14",ch:"Social",dau:1,dwl:0},{date:"2026-07-14",ch:"(Other)",dau:1,dwl:1},
+  {date:"2026-07-15",ch:"Growth",dau:1,dwl:1},{date:"2026-07-16",ch:"Growth",dau:1,dwl:0},{date:"2026-07-17",ch:"Growth",dau:4,dwl:0},
+  {date:"2026-07-18",ch:"Growth",dau:8,dwl:1},{date:"2026-07-19",ch:"Growth",dau:6,dwl:4},{date:"2026-07-20",ch:"(Other)",dau:15,dwl:0},
+  {date:"2026-07-20",ch:"Growth",dau:10,dwl:3},{date:"2026-07-21",ch:"Growth",dau:14,dwl:1},{date:"2026-07-21",ch:"(Other)",dau:17,dwl:0},
+  {date:"2026-07-22",ch:"Growth",dau:7,dwl:1},{date:"2026-07-22",ch:"(Other)",dau:16,dwl:1},{date:"2026-07-23",ch:"(Other)",dau:26,dwl:0},
+  {date:"2026-07-23",ch:"Growth",dau:7,dwl:1},{date:"2026-07-24",ch:"Growth",dau:11,dwl:1},{date:"2026-07-24",ch:"(Other)",dau:11,dwl:0},
+  {date:"2026-07-25",ch:"(Other)",dau:10,dwl:0},{date:"2026-07-25",ch:"Paid Search",dau:34,dwl:4},{date:"2026-07-25",ch:"Growth",dau:5,dwl:0},
+  {date:"2026-07-25",ch:"Display",dau:14,dwl:1},{date:"2026-07-26",ch:"Growth",dau:10,dwl:3},{date:"2026-07-26",ch:"Paid Search",dau:14,dwl:0},
+  {date:"2026-07-26",ch:"Display",dau:8,dwl:0},{date:"2026-07-26",ch:"(Other)",dau:8,dwl:0},{date:"2026-07-27",ch:"Growth",dau:15,dwl:3},
+  {date:"2026-07-27",ch:"Paid Search",dau:30,dwl:3},{date:"2026-07-27",ch:"Display",dau:2,dwl:0},{date:"2026-07-27",ch:"(Other)",dau:2,dwl:0},
+  {date:"2026-07-28",ch:"Paid Search",dau:379,dwl:41},{date:"2026-07-28",ch:"Display",dau:21,dwl:2},{date:"2026-07-28",ch:"(Other)",dau:4,dwl:0},
+  {date:"2026-07-28",ch:"Growth",dau:7,dwl:0},{date:"2026-07-29",ch:"Paid Search",dau:417,dwl:23},{date:"2026-07-29",ch:"Display",dau:43,dwl:2},
+  {date:"2026-07-29",ch:"(Other)",dau:6,dwl:0},{date:"2026-07-29",ch:"Growth",dau:8,dwl:2},{date:"2026-07-30",ch:"Paid Search",dau:60,dwl:11},
+  {date:"2026-07-30",ch:"Growth",dau:6,dwl:1},{date:"2026-07-30",ch:"(Other)",dau:19,dwl:0},{date:"2026-07-30",ch:"Display",dau:17,dwl:0},
+  {date:"2026-07-31",ch:"Paid Search",dau:144,dwl:9},{date:"2026-07-31",ch:"Growth",dau:8,dwl:3},{date:"2026-07-31",ch:"Display",dau:11,dwl:1},
+  {date:"2026-07-31",ch:"(Other)",dau:9,dwl:0},{date:"2026-08-01",ch:"Paid Search",dau:100,dwl:4},{date:"2026-08-01",ch:"Growth",dau:11,dwl:1},
+  {date:"2026-08-01",ch:"Display",dau:5,dwl:1},{date:"2026-08-01",ch:"(Other)",dau:2,dwl:0},{date:"2026-08-02",ch:"Paid Search",dau:191,dwl:15},
+  {date:"2026-08-02",ch:"Growth",dau:10,dwl:0},{date:"2026-08-02",ch:"Display",dau:8,dwl:0},{date:"2026-08-02",ch:"(Other)",dau:2,dwl:0},
+  {date:"2026-08-03",ch:"Paid Search",dau:72,dwl:6},{date:"2026-08-03",ch:"Display",dau:12,dwl:0},{date:"2026-08-03",ch:"Growth",dau:9,dwl:1},
+  {date:"2026-08-03",ch:"(Other)",dau:9,dwl:0},{date:"2026-08-04",ch:"Paid Search",dau:83,dwl:11},{date:"2026-08-04",ch:"Display",dau:10,dwl:0},
+  {date:"2026-08-04",ch:"Growth",dau:12,dwl:3},{date:"2026-08-04",ch:"(Other)",dau:14,dwl:0},
+];
+const SNAPSHOT_SOURCE_MEDIUM_ROWS = [
+  {date:"2026-07-13",ch:"adtima / social",dau:1,dwl:1},{date:"2026-07-14",ch:"facebook / social",dau:1,dwl:0},{date:"2026-07-14",ch:"adtima / social",dau:1,dwl:1},
+  {date:"2026-07-15",ch:"banner / ssa",dau:1,dwl:1},{date:"2026-07-16",ch:"banner / floatingbutton",dau:1,dwl:0},{date:"2026-07-17",ch:"banner / floatingbutton",dau:4,dwl:0},
+  {date:"2026-07-18",ch:"banner / floatingbutton",dau:8,dwl:1},{date:"2026-07-19",ch:"banner / floatingbutton",dau:4,dwl:2},{date:"2026-07-19",ch:"banner / ssa",dau:2,dwl:2},
+  {date:"2026-07-20",ch:"adtima / social",dau:15,dwl:0},{date:"2026-07-20",ch:"banner / floatingbutton",dau:9,dwl:2},{date:"2026-07-20",ch:"banner / ssa",dau:1,dwl:1},
+  {date:"2026-07-21",ch:"banner / floatingbutton",dau:12,dwl:0},{date:"2026-07-21",ch:"adtima / social",dau:17,dwl:0},{date:"2026-07-21",ch:"banner / ssa",dau:2,dwl:1},
+  {date:"2026-07-22",ch:"adtima / social",dau:16,dwl:1},{date:"2026-07-22",ch:"banner / floatingbutton",dau:5,dwl:1},{date:"2026-07-22",ch:"banner / ssa",dau:2,dwl:0},
+  {date:"2026-07-23",ch:"banner / ssa",dau:2,dwl:1},{date:"2026-07-23",ch:"adtima / social",dau:26,dwl:0},{date:"2026-07-23",ch:"banner / floatingbutton",dau:5,dwl:0},
+  {date:"2026-07-24",ch:"adtima / social",dau:11,dwl:0},{date:"2026-07-24",ch:"banner / floatingbutton",dau:9,dwl:0},{date:"2026-07-24",ch:"banner / ssa",dau:1,dwl:1},
+  {date:"2026-07-24",ch:"banner / web_to_app",dau:1,dwl:0},{date:"2026-07-25",ch:"google / cpc",dau:34,dwl:4},{date:"2026-07-25",ch:"google / pmax",dau:14,dwl:1},
+  {date:"2026-07-25",ch:"banner / floatingbutton",dau:5,dwl:0},{date:"2026-07-25",ch:"adtima / social",dau:10,dwl:0},{date:"2026-07-26",ch:"google / cpc",dau:14,dwl:0},
+  {date:"2026-07-26",ch:"adtima / social",dau:8,dwl:0},{date:"2026-07-26",ch:"google / pmax",dau:8,dwl:0},{date:"2026-07-26",ch:"banner / floatingbutton",dau:10,dwl:3},
+  {date:"2026-07-27",ch:"banner / floatingbutton",dau:14,dwl:2},{date:"2026-07-27",ch:"google / pmax",dau:2,dwl:0},{date:"2026-07-27",ch:"google / cpc",dau:30,dwl:3},
+  {date:"2026-07-27",ch:"adtima / social",dau:2,dwl:0},{date:"2026-07-27",ch:"banner / ssa",dau:1,dwl:1},{date:"2026-07-28",ch:"google / cpc",dau:379,dwl:41},
+  {date:"2026-07-28",ch:"google / pmax",dau:21,dwl:2},{date:"2026-07-28",ch:"banner / floatingbutton",dau:7,dwl:0},{date:"2026-07-28",ch:"adtima / social",dau:4,dwl:0},
+  {date:"2026-07-29",ch:"google / cpc",dau:417,dwl:23},{date:"2026-07-29",ch:"google / pmax",dau:26,dwl:2},{date:"2026-07-29",ch:"facebook / display",dau:17,dwl:0},
+  {date:"2026-07-29",ch:"banner / floatingbutton",dau:6,dwl:1},{date:"2026-07-29",ch:"growth_email / email",dau:2,dwl:0},{date:"2026-07-29",ch:"adtima / social",dau:4,dwl:0},
+  {date:"2026-07-29",ch:"banner / ssa",dau:2,dwl:1},{date:"2026-07-30",ch:"google / cpc",dau:60,dwl:11},{date:"2026-07-30",ch:"banner / floatingbutton",dau:6,dwl:1},
+  {date:"2026-07-30",ch:"adtima / social",dau:19,dwl:0},{date:"2026-07-30",ch:"facebook / display",dau:13,dwl:0},{date:"2026-07-30",ch:"google / pmax",dau:4,dwl:0},
+  {date:"2026-07-31",ch:"google / cpc",dau:144,dwl:9},{date:"2026-07-31",ch:"adtima / social",dau:9,dwl:0},{date:"2026-07-31",ch:"banner / floatingbutton",dau:6,dwl:1},
+  {date:"2026-07-31",ch:"google / pmax",dau:5,dwl:1},{date:"2026-07-31",ch:"facebook / display",dau:6,dwl:0},{date:"2026-07-31",ch:"banner / ssa",dau:2,dwl:2},
+  {date:"2026-08-01",ch:"google / cpc",dau:100,dwl:4},{date:"2026-08-01",ch:"banner / floatingbutton",dau:11,dwl:1},{date:"2026-08-01",ch:"facebook / display",dau:3,dwl:0},
+  {date:"2026-08-01",ch:"google / pmax",dau:2,dwl:1},{date:"2026-08-01",ch:"adtima / social",dau:2,dwl:0},{date:"2026-08-02",ch:"google / cpc",dau:191,dwl:15},
+  {date:"2026-08-02",ch:"facebook / display",dau:8,dwl:0},{date:"2026-08-02",ch:"banner / floatingbutton",dau:10,dwl:0},{date:"2026-08-02",ch:"adtima / social",dau:2,dwl:0},
+  {date:"2026-08-03",ch:"adtima / social",dau:9,dwl:0},{date:"2026-08-03",ch:"google / cpc",dau:72,dwl:6},{date:"2026-08-03",ch:"banner / floatingbutton",dau:9,dwl:1},
+  {date:"2026-08-03",ch:"facebook / display",dau:12,dwl:0},{date:"2026-08-04",ch:"facebook / display",dau:10,dwl:0},{date:"2026-08-04",ch:"banner / floatingbutton",dau:11,dwl:3},
+  {date:"2026-08-04",ch:"google / cpc",dau:83,dwl:11},{date:"2026-08-04",ch:"adtima / social",dau:13,dwl:0},{date:"2026-08-04",ch:"pr / social",dau:1,dwl:0},
+  {date:"2026-08-04",ch:"banner / web_to_app",dau:1,dwl:0},
+];
+
+function renderChannelChart() {
+  const dates = Array.from(new Set(channelRawRows.map(r=>r.date))).sort();
+  const channels = Array.from(new Set(channelRawRows.map(r=>r.ch || '(none)')));
+  const datasets = channels.map((ch, i) => {
+    const byDate = {};
+    channelRawRows.forEach(r => { if ((r.ch||'(none)') === ch) byDate[r.date] = Number(r[channelMetric]||0); });
+    return { label: ch, data: dates.map(d => byDate[d] || 0), borderColor: CHANNEL_COLORS[i % CHANNEL_COLORS.length], backgroundColor: 'transparent', tension: 0.2, pointRadius: 1 };
+  });
+  const ctx = document.getElementById('channelChart');
+  if (channelChartInstance) channelChartInstance.destroy();
+  channelChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: { labels: dates, datasets },
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${fmt(c.raw)}` } } },
+      scales: { x: { ticks: { maxTicksLimit: 12 } } } }
+  });
+}
+async function renderChannelBreakdown() {
+  const status = document.getElementById('channelStatus');
+  channelRawRows = SNAPSHOT_CHANNEL_GROUPING_ROWS;
+  renderChannelChart();
+  status.textContent = `SNAPSHOT (chốt 04/08/2026) · ${Array.from(new Set(channelRawRows.map(r=>r.ch))).length} channel grouping`;
+}
+
+let sourceMediumChartInstance = null;
+let sourceMediumRawRows = [];
+function renderSourceMediumChart() {
+  const dates = Array.from(new Set(sourceMediumRawRows.map(r=>r.date))).sort();
+  const channels = Array.from(new Set(sourceMediumRawRows.map(r=>r.ch || '(none)')));
+  const datasets = channels.map((ch, i) => {
+    const byDate = {};
+    sourceMediumRawRows.forEach(r => { if ((r.ch||'(none)') === ch) byDate[r.date] = Number(r[channelMetric]||0); });
+    return { label: ch, data: dates.map(d => byDate[d] || 0), borderColor: CHANNEL_COLORS[i % CHANNEL_COLORS.length], backgroundColor: 'transparent', tension: 0.2, pointRadius: 1 };
+  });
+  const ctx = document.getElementById('sourceMediumChart');
+  if (sourceMediumChartInstance) sourceMediumChartInstance.destroy();
+  sourceMediumChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: { labels: dates, datasets },
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${fmt(c.raw)}` } } },
+      scales: { x: { ticks: { maxTicksLimit: 12 } } } }
+  });
+}
+async function renderSourceMediumBreakdown() {
+  const status = document.getElementById('sourceMediumStatus');
+  sourceMediumRawRows = SNAPSHOT_SOURCE_MEDIUM_ROWS;
+  renderSourceMediumChart();
+  status.textContent = `SNAPSHOT (chốt 04/08/2026) · ${Array.from(new Set(sourceMediumRawRows.map(r=>r.ch))).length} source/medium`;
+}
+
+// ---------- OOH Monitor — SNAPSHOT TĨNH (chốt 04/08/2026) ----------
+const OOH_LAUNCH_DATE = '2026-07-22';
+const OOH_CONTENT_TOP_N = 8;
+let oohContentDailyRawRows = [];
+
+const SNAPSHOT_OOH_FUNNEL_ROWS = [
+  {date:"2026-07-22",clicks:1,installs:null,opens:4,web_opens:null},{date:"2026-07-23",clicks:5,installs:null,opens:3,web_opens:null},
+  {date:"2026-07-24",clicks:52,installs:3,opens:5,web_opens:null},{date:"2026-07-25",clicks:0,installs:null,opens:null,web_opens:null},
+  {date:"2026-07-26",clicks:0,installs:null,opens:1,web_opens:null},{date:"2026-07-27",clicks:50,installs:2,opens:4,web_opens:null},
+  {date:"2026-07-28",clicks:30,installs:1,opens:3,web_opens:null},{date:"2026-07-29",clicks:7,installs:null,opens:2,web_opens:null},
+  {date:"2026-07-30",clicks:10,installs:null,opens:null,web_opens:null},{date:"2026-07-31",clicks:15,installs:null,opens:1,web_opens:null},
+  {date:"2026-08-01",clicks:0,installs:null,opens:null,web_opens:null},{date:"2026-08-02",clicks:2,installs:null,opens:null,web_opens:null},
+  {date:"2026-08-03",clicks:13,installs:1,opens:1,web_opens:null},{date:"2026-08-04",clicks:0,installs:null,opens:2,web_opens:null},
+];
+const SNAPSHOT_OOH_CONTENT_DAILY_ROWS = [
+  {date:"2026-07-10",utm_content:"l2_3",clicks:3},{date:"2026-07-10",utm_content:"l2_2",clicks:3},{date:"2026-07-10",utm_content:"l2_1",clicks:2},
+  {date:"2026-07-11",utm_content:"l2_1",clicks:3},{date:"2026-07-12",utm_content:"l2_1",clicks:0},{date:"2026-07-13",utm_content:"l2_3",clicks:1},
+  {date:"2026-07-14",utm_content:"l2_1",clicks:65},{date:"2026-07-14",utm_content:"l2_3",clicks:30},{date:"2026-07-14",utm_content:"l2_2",clicks:18},
+  {date:"2026-07-15",utm_content:"l2_1",clicks:16},{date:"2026-07-15",utm_content:"l2_3",clicks:1},{date:"2026-07-15",utm_content:"l2_2",clicks:12},
+  {date:"2026-07-16",utm_content:"l2_2",clicks:0},{date:"2026-07-16",utm_content:"l2_1",clicks:1},{date:"2026-07-17",utm_content:"l2_1",clicks:23},
+  {date:"2026-07-17",utm_content:"l2_4",clicks:2},{date:"2026-07-17",utm_content:"l2_6",clicks:1},{date:"2026-07-17",utm_content:"l2_2",clicks:3},
+  {date:"2026-07-18",utm_content:"l2_2",clicks:0},{date:"2026-07-18",utm_content:"l2_6",clicks:0},{date:"2026-07-19",utm_content:"l2_6",clicks:0},
+  {date:"2026-07-20",utm_content:"l2_6",clicks:2},{date:"2026-07-20",utm_content:"l1_5",clicks:4},{date:"2026-07-20",utm_content:"l2_4",clicks:0},
+  {date:"2026-07-20",utm_content:"l2_2",clicks:0},{date:"2026-07-20",utm_content:"l2_1",clicks:0},{date:"2026-07-21",utm_content:"l2_2",clicks:0},
+  {date:"2026-07-21",utm_content:"l2_4",clicks:12},{date:"2026-07-21",utm_content:"l2_6",clicks:0},{date:"2026-07-21",utm_content:"l1_5",clicks:2},
+  {date:"2026-07-21",utm_content:"l2_1",clicks:1},{date:"2026-07-21",utm_content:"l2_7",clicks:4},{date:"2026-07-22",utm_content:"l3_1",clicks:1},
+  {date:"2026-07-22",utm_content:"l2_2",clicks:0},{date:"2026-07-22",utm_content:"l2_4",clicks:0},{date:"2026-07-22",utm_content:"l1_5",clicks:0},
+  {date:"2026-07-22",utm_content:"l2_7",clicks:0},{date:"2026-07-23",utm_content:"l2_8",clicks:2},{date:"2026-07-23",utm_content:"l2_2",clicks:0},
+  {date:"2026-07-23",utm_content:"l2_7",clicks:2},{date:"2026-07-23",utm_content:"l3_3",clicks:1},{date:"2026-07-23",utm_content:"l2_4",clicks:0},
+  {date:"2026-07-24",utm_content:"l3_2",clicks:4},{date:"2026-07-24",utm_content:"l2_7",clicks:22},{date:"2026-07-24",utm_content:"l2_6",clicks:9},
+  {date:"2026-07-24",utm_content:"l2_4",clicks:6},{date:"2026-07-24",utm_content:"l1_5",clicks:9},{date:"2026-07-24",utm_content:"l2_8",clicks:2},
+  {date:"2026-07-24",utm_content:"l2_2",clicks:0},{date:"2026-07-25",utm_content:"l2_7",clicks:0},{date:"2026-07-25",utm_content:"l2_8",clicks:0},
+  {date:"2026-07-26",utm_content:"l2_2",clicks:0},{date:"2026-07-26",utm_content:"l2_8",clicks:0},{date:"2026-07-27",utm_content:"l2_1",clicks:50},
+  {date:"2026-07-27",utm_content:"l2_6",clicks:0},{date:"2026-07-27",utm_content:"l2_4",clicks:0},{date:"2026-07-27",utm_content:"l2_8",clicks:0},
+  {date:"2026-07-28",utm_content:"l2_1",clicks:16},{date:"2026-07-28",utm_content:"l2_4",clicks:14},{date:"2026-07-28",utm_content:"l2_2",clicks:0},
+  {date:"2026-07-29",utm_content:"l3_2",clicks:2},{date:"2026-07-29",utm_content:"l2_7",clicks:2},{date:"2026-07-29",utm_content:"l2_1",clicks:0},
+  {date:"2026-07-29",utm_content:"l2_4",clicks:0},{date:"2026-07-29",utm_content:"l2_2",clicks:0},{date:"2026-07-29",utm_content:"l3_1",clicks:3},
+  {date:"2026-07-30",utm_content:"l3_2",clicks:2},{date:"2026-07-30",utm_content:"l2_8",clicks:3},{date:"2026-07-30",utm_content:"l2_4",clicks:0},
+  {date:"2026-07-30",utm_content:"l2_1",clicks:0},{date:"2026-07-30",utm_content:"l2_7",clicks:0},{date:"2026-07-30",utm_content:"l3_1",clicks:3},
+  {date:"2026-07-30",utm_content:"l3_3",clicks:2},{date:"2026-07-31",utm_content:"l2_10",clicks:4},{date:"2026-07-31",utm_content:"l3_1",clicks:0},
+  {date:"2026-07-31",utm_content:"l2_11",clicks:3},{date:"2026-07-31",utm_content:"l1_13",clicks:4},{date:"2026-07-31",utm_content:"l1_12",clicks:1},
+  {date:"2026-07-31",utm_content:"l2_2",clicks:0},{date:"2026-07-31",utm_content:"l1_9",clicks:2},{date:"2026-07-31",utm_content:"l2_4",clicks:1},
+  {date:"2026-08-01",utm_content:"l2_4",clicks:0},{date:"2026-08-01",utm_content:"l2_1",clicks:0},{date:"2026-08-02",utm_content:"l2_11",clicks:0},
+  {date:"2026-08-02",utm_content:"l3_1",clicks:2},{date:"2026-08-02",utm_content:"l2_1",clicks:0},{date:"2026-08-02",utm_content:"l2_4",clicks:0},
+  {date:"2026-08-03",utm_content:"l3_1",clicks:0},{date:"2026-08-03",utm_content:"l1_13",clicks:0},{date:"2026-08-03",utm_content:"l2_4",clicks:0},
+  {date:"2026-08-03",utm_content:"l2_1",clicks:3},{date:"2026-08-03",utm_content:"l1_5",clicks:10},{date:"2026-08-04",utm_content:"l2_1",clicks:0},
+  {date:"2026-08-04",utm_content:"l1_5",clicks:0},
+];
+const SNAPSHOT_OOH_RANKING_ROWS = [
+  {utm_content:"l2_1",clicks:69,installs:3,opens:4},{utm_content:"l2_7",clicks:26,installs:2,opens:1},{utm_content:"l2_4",clicks:21,installs:1,opens:3},
+  {utm_content:"l1_5",clicks:19,installs:1,opens:1},{utm_content:"l3_1",clicks:9,installs:null,opens:null},{utm_content:"l2_6",clicks:9,installs:1,opens:2},
+  {utm_content:"l3_2",clicks:8,installs:1,opens:null},{utm_content:"l2_8",clicks:7,installs:null,opens:1},{utm_content:"l2_10",clicks:4,installs:null,opens:null},
+  {utm_content:"l1_13",clicks:4,installs:null,opens:null},{utm_content:"l3_3",clicks:3,installs:null,opens:null},{utm_content:"l2_11",clicks:3,installs:null,opens:null},
+  {utm_content:"l1_9",clicks:2,installs:null,opens:null},{utm_content:"l1_12",clicks:1,installs:null,opens:null},{utm_content:"l2_2",clicks:0,installs:null,opens:2},
+];
+
+async function loadOOHFunnelData() {
+  const status = document.getElementById('oohFunnelStatus');
+  const rows = SNAPSHOT_OOH_FUNNEL_ROWS;
+  const totals = rows.reduce((acc, r) => {
+    acc.clicks += Number(r.clicks) || 0;
+    acc.installs += Number(r.installs) || 0;
+    acc.opens += Number(r.opens) || 0;
+    acc.webOpens += Number(r.web_opens) || 0;
+    return acc;
+  }, { clicks: 0, installs: 0, opens: 0, webOpens: 0 });
+  renderOOHFunnelCards(totals);
+  renderOOHFunnelChart(totals);
+  if (status) status.textContent = `SNAPSHOT (chốt 04/08/2026) · từ ${OOH_LAUNCH_DATE.split('-').reverse().join('/')} (ngày launch chính thức) · ${rows.length} ngày có data`;
+  return totals;
+}
+
+function renderOOHFunnelCards(totals) {
+  const grid = document.getElementById('oohFunnelHighlight');
+  if (!grid) return;
+  if (!totals) { grid.innerHTML = ''; return; }
+  const crInstall = totals.clicks ? (totals.installs / totals.clicks * 100) : null;
+  const crOpen = totals.clicks ? (totals.opens / totals.clicks * 100) : null;
+  const crWebOpen = totals.clicks ? (totals.webOpens / totals.clicks * 100) : null;
+  const tiles = [
+    { label: 'Click', value: totals.clicks, extra: 'Từ Airbridge, channel=ooh' },
+    { label: 'Install (chưa có app)', value: totals.installs, extra: crInstall !== null ? `${fmt2(crInstall)}% so với Click` : '' },
+    { label: 'Open App (đã có app)', value: totals.opens, extra: crOpen !== null ? `${fmt2(crOpen)}% so với Click` : '' },
+    { label: 'Open Web (fallback, không cài)', value: totals.webOpens, extra: crWebOpen !== null ? `${fmt2(crWebOpen)}% so với Click` : '' },
+  ];
+  grid.innerHTML = tiles.map(t => `<div class="htile"><div class="hlabel">${t.label} <span class="badge snapshot">SNAPSHOT</span></div><div class="hvalue">${fmt(t.value)}</div>${t.extra ? `<div class="htarget">${t.extra}</div>` : ''}</div>`).join('');
+}
+
+let oohFunnelChartInstance = null;
+function renderOOHFunnelChart(totals) {
+  const ctx = document.getElementById('oohFunnelChart');
+  if (!ctx) return;
+  if (oohFunnelChartInstance) oohFunnelChartInstance.destroy();
+  if (!totals) return;
+  const labels = ['Click', 'Install (chưa có app)', 'Open App (đã có app)', 'Open Web (fallback)'];
+  const values = [totals.clicks, totals.installs, totals.opens, totals.webOpens];
+  const colors = ['#2563AA', '#1B8A5A', '#F5811F', '#7A5AF8'];
+  oohFunnelChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ data: values, backgroundColor: colors }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => fmt(c.raw) } } },
+      scales: { x: { beginAtZero: true, ticks: { callback: (v) => fmt(v) } } } }
+  });
+}
+
+const oohLaunchLinePlugin = {
+  id: 'oohLaunchLine',
+  afterDatasetsDraw(chart) {
+    const opts = chart.options && chart.options.plugins && chart.options.plugins.oohLaunchLine;
+    if (!opts || !opts.enabled) return;
+    const labels = chart.data.labels || [];
+    const idx = labels.indexOf(OOH_LAUNCH_DATE);
+    if (idx === -1) return;
+    const xScale = chart.scales.x;
+    if (!xScale) return;
+    const x = xScale.getPixelForValue(idx);
+    const { ctx, chartArea } = chart;
+    ctx.save();
+    ctx.strokeStyle = '#C23B3B';
+    ctx.setLineDash([5, 4]);
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x, chartArea.top);
+    ctx.lineTo(x, chartArea.bottom);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#C23B3B';
+    ctx.font = 'bold 10.5px sans-serif';
+    ctx.fillText('22/7 · Launch chính thức', x + 4, chartArea.top + 12);
+    ctx.restore();
+  }
+};
+Chart.register(oohLaunchLinePlugin);
+
+async function loadOOHContentDaily() {
+  oohContentDailyRawRows = SNAPSHOT_OOH_CONTENT_DAILY_ROWS;
+  renderOOHContentLineChart();
+  renderOOHContentStackChart();
+  return oohContentDailyRawRows;
+}
+
+function oohContentTopValues() {
+  const totalByVal = {};
+  oohContentDailyRawRows.forEach(r => { const v = r.utm_content || '(none)'; totalByVal[v] = (totalByVal[v] || 0) + Number(r.clicks || 0); });
+  const ranked = Object.keys(totalByVal).sort((a, b) => totalByVal[b] - totalByVal[a]);
+  const top = ranked.slice(0, OOH_CONTENT_TOP_N);
+  return { ranked, top, hasOther: ranked.length > OOH_CONTENT_TOP_N };
+}
+
+let oohContentLineChartInstance = null;
+function renderOOHContentLineChart() {
+  const status = document.getElementById('oohContentLineStatus');
+  const ctx = document.getElementById('oohContentLineChart');
+  if (!ctx) return;
+  const dates = Array.from(new Set(oohContentDailyRawRows.map(r => r.date))).sort();
+  const { top, hasOther } = oohContentTopValues();
+  const values = hasOther ? [...top, '(khác)'] : top;
+  const byDateByVal = {};
+  oohContentDailyRawRows.forEach(r => {
+    const raw = r.utm_content || '(none)';
+    const v = top.includes(raw) ? raw : '(khác)';
+    if (!byDateByVal[r.date]) byDateByVal[r.date] = {};
+    byDateByVal[r.date][v] = (byDateByVal[r.date][v] || 0) + Number(r.clicks || 0);
+  });
+  const datasets = values.map((v, i) => ({
+    label: v, data: dates.map(d => (byDateByVal[d] && byDateByVal[d][v]) || 0),
+    borderColor: v === '(khác)' ? '#C9CDD3' : CAMPAIGN_BREAKDOWN_PALETTE[i % CAMPAIGN_BREAKDOWN_PALETTE.length],
+    backgroundColor: 'transparent', fill: false, tension: 0.2, pointRadius: 1,
+  }));
+  if (oohContentLineChartInstance) oohContentLineChartInstance.destroy();
+  oohContentLineChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: { labels: dates, datasets },
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${fmt(c.raw)} clicks` } }, oohLaunchLine: { enabled: true } },
+      scales: { x: { ticks: { maxTicksLimit: 12 } }, y: { beginAtZero: true } } }
+  });
+  if (status) status.textContent = `SNAPSHOT (chốt 04/08/2026) · ${dates.length} ngày (từ 29/06) · vạch đỏ = 22/7 ngày launch chính thức`;
+}
+
+let oohContentStackChartInstance = null;
+function renderOOHContentStackChart() {
+  const ctx = document.getElementById('oohContentStackChart');
+  if (!ctx) return;
+  const dates = Array.from(new Set(oohContentDailyRawRows.map(r => r.date))).sort();
+  const { top, hasOther } = oohContentTopValues();
+  const values = hasOther ? [...top, '(khác)'] : top;
+  const byDateByVal = {};
+  oohContentDailyRawRows.forEach(r => {
+    const raw = r.utm_content || '(none)';
+    const v = top.includes(raw) ? raw : '(khác)';
+    if (!byDateByVal[r.date]) byDateByVal[r.date] = {};
+    byDateByVal[r.date][v] = (byDateByVal[r.date][v] || 0) + Number(r.clicks || 0);
+  });
+  const datasets = values.map((v, i) => ({
+    label: v, data: dates.map(d => (byDateByVal[d] && byDateByVal[d][v]) || 0),
+    backgroundColor: v === '(khác)' ? '#C9CDD3' : CAMPAIGN_BREAKDOWN_PALETTE[i % CAMPAIGN_BREAKDOWN_PALETTE.length],
+    stack: 'stack1',
+  }));
+  if (oohContentStackChartInstance) oohContentStackChartInstance.destroy();
+  oohContentStackChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: dates, datasets },
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${fmt(c.raw)} clicks` } }, oohLaunchLine: { enabled: true } },
+      scales: { x: { stacked: true, ticks: { maxTicksLimit: 12 } }, y: { stacked: true, beginAtZero: true } } }
+  });
+}
+
+async function loadOOHRanking() {
+  const status = document.getElementById('oohRankingStatus');
+  const table = document.getElementById('oohRankingTable');
+  const rows = SNAPSHOT_OOH_RANKING_ROWS;
+  const rowsHtml = rows.map(r => {
+    const clicks = Number(r.clicks) || 0;
+    const installs = r.installs != null ? Number(r.installs) : null;
+    const opens = r.opens != null ? Number(r.opens) : null;
+    const crInstall = (installs !== null && clicks) ? (installs / clicks * 100) : null;
+    const crOpen = (opens !== null && clicks) ? (opens / clicks * 100) : null;
+    return `<tr><td>${r.utm_content || '(none)'}</td><td class="num">${fmt(clicks)}</td>
+      <td class="num">${installs !== null ? fmt(installs) : '—'}</td><td class="num">${crInstall !== null ? fmt2(crInstall) + '%' : '—'}</td>
+      <td class="num">${opens !== null ? fmt(opens) : '—'}</td><td class="num">${crOpen !== null ? fmt2(crOpen) + '%' : '—'}</td></tr>`;
+  }).join('');
+  table.innerHTML = `<thead><tr><th>Vị trí (utm_content)</th><th class="num">Click</th><th class="num">Install</th><th class="num">CR Click→Install</th><th class="num">Open App</th><th class="num">CR Click→Open</th></tr></thead>
+    <tbody>${rowsHtml || '<tr><td colspan="6" style="color:var(--ink-soft)">Không có data</td></tr>'}</tbody>`;
+  if (status) status.textContent = `SNAPSHOT (chốt 04/08/2026) · từ ${OOH_LAUNCH_DATE.split('-').reverse().join('/')} · ${rows.length} vị trí`;
+}
+
+// ---------- Paid link (Social buzz/engagement) + Adtima — SNAPSHOT TĨNH (chốt 04/08/2026) ----------
+// GHI CHÚ QUAN TRỌNG: sheet Paid Link (~100k ký tự, hàng trăm dòng caption dài) quá lớn để đóng băng an
+// toàn/rẻ trong lần snapshot này — KHÔNG bịa số, hiện rõ "chưa đóng băng được" thay vì số sai/thiếu.
+// Adtima (nhỏ hơn nhiều) đã fetch đầy đủ, có số thật.
+const PAID_LINK_SHEET_ID = '153gBSZu2UcqSvnahMOfxm4Djm43V5g2GdLkJA3-7Oao';
+const ADTIMA_SHEET_ID = '1qZ9PCQ_LiwP_DmE7J1Bg7EAU7wG6__jyx3hLrrPzhgE';
+
+let PAID_LINK_POSTS = [];
+let ALL_BUZZ_CHANNEL_NAMES = [];
+let BUZZ_CH_COLORS = {};
+let BUZZ_CHANNELS = [];
+let TOTAL_SOCIAL_BUZZ = 0;
+let TOTAL_SOCIAL_ENGAGEMENT = 0;
+const BUZZ_CH_PALETTE = ['#0D3B66','#F5811F','#1B8A5A','#B8790A','#7A5AF8','#C23B3B','#2563AA','#111111','#9333EA','#0EA5A5'];
+
+function postBuzz(p) { return p.post + p.repost + p.comment + p.share; }
+function postEngagement(p) { return p.repost + p.comment + p.share + p.react + p.save; }
+
+function groupPostsByType(posts) {
+  const groups = {};
+  ALL_BUZZ_CHANNEL_NAMES.forEach(name => { groups[name] = []; });
+  posts.forEach(p => { (groups[p.channel] || (groups[p.channel] = [])).push(p); });
+  return Object.entries(groups).map(([name, gposts]) => ({
+    name,
+    post: gposts.reduce((s,p)=>s+p.post,0),
+    comment: gposts.reduce((s,p)=>s+p.comment,0),
+    share: gposts.reduce((s,p)=>s+p.share,0),
+    repost: gposts.reduce((s,p)=>s+p.repost,0),
+    react: gposts.reduce((s,p)=>s+p.react,0),
+    save: gposts.reduce((s,p)=>s+p.save,0),
+    buzz: gposts.reduce((s,p)=>s+postBuzz(p),0),
+    engagement: gposts.reduce((s,p)=>s+postEngagement(p),0),
+  }));
+}
+async function loadPaidLinkSection() {
+  // Không đóng băng được trong snapshot này (sheet quá lớn) — để trống rõ ràng, không bịa số.
+  PAID_LINK_POSTS = [];
+  ALL_BUZZ_CHANNEL_NAMES = [];
+  BUZZ_CHANNELS = [];
+  TOTAL_SOCIAL_BUZZ = 0;
+  TOTAL_SOCIAL_ENGAGEMENT = 0;
+  filtersT2.channels = new Set();
+  renderBuzzChannelFilterCheckboxes();
+  rerenderT2();
+  return { totalBuzz: 0, totalEngagement: 0, unavailable: true };
+}
+
+const SNAPSHOT_ADTIMA_IMPRESSION_TOTAL = 596421;
+const SNAPSHOT_ADTIMA_CLICK_TOTAL = 608;
+const SNAPSHOT_ADTIMA_DAILY_ROWS = [
+  {date:"2026-07-20",impression:11287},{date:"2026-07-21",impression:28552},{date:"2026-07-22",impression:46209},
+  {date:"2026-07-23",impression:84340},{date:"2026-07-24",impression:26953},{date:"2026-07-25",impression:73836},
+  {date:"2026-07-26",impression:43047},{date:"2026-07-27",impression:26276},{date:"2026-07-28",impression:18274},
+  {date:"2026-07-29",impression:32094},{date:"2026-07-30",impression:62687},{date:"2026-07-31",impression:36992},
+  {date:"2026-08-01",impression:14176},{date:"2026-08-02",impression:21807},{date:"2026-08-03",impression:29606},
+  {date:"2026-08-04",impression:40285},
+];
+let adtimaDailyRowsCache = [];
+async function loadAdtimaSection() {
+  adtimaDailyRowsCache = SNAPSHOT_ADTIMA_DAILY_ROWS;
+  const row = document.getElementById('adtimaImpressionRow');
+  if (row) {
+    row.innerHTML = `<td>Media block Bất Động Sản (Znews) <span class="badge snapshot">SNAPSHOT</span></td><td class="num">${SNAPSHOT_ADTIMA_IMPRESSION_TOTAL.toLocaleString('vi-VN')}</td><td class="num">—</td><td class="num">${SNAPSHOT_ADTIMA_CLICK_TOTAL}</td><td class="num">—</td>`;
+  }
+  return SNAPSHOT_ADTIMA_IMPRESSION_TOTAL;
+}
+
+const filtersT2 = { from: '2026-07-01', to: '2026-08-31', channels: new Set() };
+
+function getFilteredPosts() {
+  return PAID_LINK_POSTS.filter(p => p.date >= filtersT2.from && p.date <= filtersT2.to && filtersT2.channels.has(p.channel));
+}
+function computeChannelGroups(posts) {
+  return groupPostsByType(posts).filter(c => filtersT2.channels.has(c.name));
+}
+function renderBuzzChannelFilterCheckboxes() {
+  const container = document.getElementById('buzzChannelFilters');
+  container.innerHTML = ALL_BUZZ_CHANNEL_NAMES.map(name =>
+    `<label style="display:flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;"><input type="checkbox" class="chBuzzCh" data-ch="${name}" checked> ${name}</label>`
+  ).join('') || '<span style="color:var(--ink-soft);font-size:12.5px;">Chưa đóng băng được trong snapshot này — xem bản Cowork live để có số đầy đủ.</span>';
+}
+
+function renderBuzzHighlight() {
+  const grid = document.getElementById('buzzHighlight');
+  const posts = getFilteredPosts();
+  const buzz = posts.reduce((s,p)=>s+postBuzz(p),0);
+  const eng = posts.reduce((s,p)=>s+postEngagement(p),0);
+  const pBuzz = pct(buzz, KPI_TARGETS.socialBuzz);
+  const pEng = pct(eng, KPI_TARGETS.socialEngagement);
+  grid.innerHTML = `
+    <div class="htile"><div class="hlabel">Social buzz <span class="badge dummy">CHƯA CÓ</span></div><div class="hvalue">${fmt(buzz)}</div><div class="htarget">Target: ${fmt(KPI_TARGETS.socialBuzz)} · sheet quá lớn để đóng băng, xem bản Cowork live</div></div>
+    <div class="htile"><div class="hlabel">Social engagement <span class="badge dummy">CHƯA CÓ</span></div><div class="hvalue">${fmt(eng)}</div><div class="htarget">Target: ${fmt(KPI_TARGETS.socialEngagement)} · sheet quá lớn để đóng băng, xem bản Cowork live</div></div>
+  `;
+}
+
+function renderDummyBuzzTables() {
+  const posts = getFilteredPosts();
+  const channels = computeChannelGroups(posts);
+  const buzzTable = document.getElementById('buzzTable');
+  const rowsHtml = channels.map(c => `<tr><td>${c.name}</td><td class="num">${c.post||'—'}</td><td class="num">${c.comment||'—'}</td>
+    <td class="num">${c.share||'—'}</td><td class="num">${c.repost||'—'}</td><td class="num">${c.react||'—'}</td><td class="num">${c.save||'—'}</td>
+    <td class="num">${c.buzz||'—'}</td><td class="num">${c.engagement||'—'}</td></tr>`).join('');
+  buzzTable.innerHTML = `
+    <thead><tr><th>Kênh</th><th class="num">Post</th><th class="num">Comment</th><th class="num">Share</th>
+    <th class="num">Repost</th><th class="num">React</th><th class="num">Save</th><th class="num">Social buzz</th><th class="num">Social engagement</th></tr></thead>
+    <tbody>${rowsHtml || '<tr><td colspan="9" style="color:var(--ink-soft)">Chưa đóng băng được trong snapshot này (sheet quá lớn) — xem bản Cowork live để có số đầy đủ.</td></tr>'}</tbody>`;
+  const topTable = document.getElementById('topPostsTable');
+  const top20 = [...posts].sort((a,b) => postBuzz(b) - postBuzz(a)).slice(0,20);
+  const topRows = top20.map(p => `<tr><td>${p.date.split('-').reverse().join('/')}</td><td>${p.title}</td><td>${p.platform}</td><td>${p.type}</td>
+    <td class="num">${fmt(postBuzz(p))}</td><td class="num">${fmt(postEngagement(p))}</td></tr>`).join('');
+  topTable.innerHTML = `
+    <thead><tr><th>Ngày</th><th>Title</th><th>Platform</th><th>Type</th><th class="num">Social buzz</th><th class="num">Social engagement</th></tr></thead>
+    <tbody>${topRows || '<tr><td colspan="6" style="color:var(--ink-soft)">Chưa đóng băng được trong snapshot này — xem bản Cowork live để có số đầy đủ.</td></tr>'}</tbody>`;
+}
+let buzzPieChartInstance = null;
+let engagementPieChartInstance = null;
+const PIE_COLORS = ['#F5811F','#2563AA','#1B8A5A','#B8790A','#7A5AF8','#C23B3B'];
+function renderBuzzPies() {
+  const channels = computeChannelGroups(getFilteredPosts());
+  const labels = channels.map(c => c.name);
+  const buzzData = channels.map(c => c.buzz);
+  const engData = channels.map(c => c.engagement);
+  const hasBuzz = buzzData.some(v => v > 0);
+  const hasEng = engData.some(v => v > 0);
+
+  const buzzCtx = document.getElementById('buzzPieChart');
+  if (buzzPieChartInstance) buzzPieChartInstance.destroy();
+  buzzPieChartInstance = new Chart(buzzCtx, {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data: hasBuzz ? buzzData : labels.map(()=>1), backgroundColor: PIE_COLORS }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 10.5 } } },
+        title: { display: true, text: 'Social buzz theo kênh' + (hasBuzz?'':' (chưa có data)'), align: 'start', font: { size: 12 } },
+        tooltip: { enabled: hasBuzz } } }
+  });
+
+  const engCtx = document.getElementById('engagementPieChart');
+  if (engagementPieChartInstance) engagementPieChartInstance.destroy();
+  engagementPieChartInstance = new Chart(engCtx, {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data: hasEng ? engData : labels.map(()=>1), backgroundColor: PIE_COLORS }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 10.5 } } },
+        title: { display: true, text: 'Social engagement theo kênh' + (hasEng?'':' (chưa có data)'), align: 'start', font: { size: 12 } },
+        tooltip: { enabled: hasEng } } }
+  });
+}
+
+function buzzDateRangeArray() {
+  const dates = [];
+  let cur = new Date(filtersT2.from);
+  const end = new Date(filtersT2.to);
+  while (cur <= end) { dates.push(cur.toISOString().slice(0,10)); cur.setDate(cur.getDate()+1); }
+  return dates;
+}
+
+// Buzz theo ngày, theo loại (Post/Comment/Share/Repost)
+let buzzByTypeChartInstance = null;
+const BUZZ_TYPE_COLORS = { Post: '#F5811F', Comment: '#2563AA', Share: '#1B8A5A', Repost: '#B8790A' };
+function renderBuzzByTypeChart() {
+  const status = document.getElementById('buzzByTypeStatus');
+  const dates = buzzDateRangeArray();
+  const posts = getFilteredPosts();
+  const types = ['Post','Comment','Share','Repost'];
+  const byDateByType = {};
+  posts.forEach(p => {
+    if (!byDateByType[p.date]) byDateByType[p.date] = { Post: 0, Comment: 0, Share: 0, Repost: 0 };
+    byDateByType[p.date].Post += p.post;
+    byDateByType[p.date].Comment += p.comment;
+    byDateByType[p.date].Share += p.share;
+    byDateByType[p.date].Repost += p.repost;
+  });
+  const datasets = types.map(t => ({ label: t, data: dates.map(d => (byDateByType[d] ? byDateByType[d][t] : 0)), backgroundColor: BUZZ_TYPE_COLORS[t], stack: 'stack1' }));
+  const ctx = document.getElementById('buzzByTypeChart');
+  if (buzzByTypeChartInstance) buzzByTypeChartInstance.destroy();
+  buzzByTypeChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: dates, datasets },
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${fmt(c.raw)}` } } },
+      scales: { x: { stacked: true, ticks: { maxTicksLimit: 12 } }, y: { stacked: true, beginAtZero: true } } }
+  });
+  status.textContent = '';
+}
+
+// Buzz theo ngày, phân theo kênh (Type: Page Owned / Group community / ... — suy động từ data)
+let buzzByChannelChartInstance = null;
+function renderBuzzByChannelChart() {
+  const status = document.getElementById('buzzByChannelStatus');
+  const dates = buzzDateRangeArray();
+  const posts = getFilteredPosts();
+  const byDateByChannel = {};
+  posts.forEach(p => {
+    const ch = p.channel;
+    if (!byDateByChannel[p.date]) byDateByChannel[p.date] = {};
+    byDateByChannel[p.date][ch] = (byDateByChannel[p.date][ch] || 0) + postBuzz(p);
+  });
+  const channels = ALL_BUZZ_CHANNEL_NAMES.filter(ch => filtersT2.channels.has(ch));
+  const datasets = channels.map(ch => ({
+    label: ch, data: dates.map(d => (byDateByChannel[d] && byDateByChannel[d][ch]) || 0),
+    backgroundColor: BUZZ_CH_COLORS[ch] || '#999', stack: 'stack1',
+  }));
+  const ctx = document.getElementById('buzzByChannelChart');
+  if (buzzByChannelChartInstance) buzzByChannelChartInstance.destroy();
+  buzzByChannelChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: dates, datasets },
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${fmt(c.raw)}` } } },
+      scales: { x: { stacked: true, ticks: { maxTicksLimit: 12 } }, y: { stacked: true, beginAtZero: true } } }
+  });
+  status.textContent = '';
+}
+
+// Engagement theo ngày, theo loại (Repost/Comment/Share/React/Save)
+let engByTypeChartInstance = null;
+const ENG_TYPE_COLORS = { Repost: '#B8790A', Comment: '#2563AA', Share: '#1B8A5A', React: '#F5811F', Save: '#7A5AF8' };
+function renderEngByTypeChart() {
+  const status = document.getElementById('engByTypeStatus');
+  const dates = buzzDateRangeArray();
+  const posts = getFilteredPosts();
+  const types = ['Repost','Comment','Share','React','Save'];
+  const byDateByType = {};
+  posts.forEach(p => {
+    if (!byDateByType[p.date]) byDateByType[p.date] = { Repost: 0, Comment: 0, Share: 0, React: 0, Save: 0 };
+    byDateByType[p.date].Repost += p.repost;
+    byDateByType[p.date].Comment += p.comment;
+    byDateByType[p.date].Share += p.share;
+    byDateByType[p.date].React += p.react;
+    byDateByType[p.date].Save += p.save;
+  });
+  const datasets = types.map(t => ({ label: t, data: dates.map(d => (byDateByType[d] ? byDateByType[d][t] : 0)), backgroundColor: ENG_TYPE_COLORS[t], stack: 'stack1' }));
+  const ctx = document.getElementById('engByTypeChart');
+  if (engByTypeChartInstance) engByTypeChartInstance.destroy();
+  engByTypeChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: dates, datasets },
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${fmt(c.raw)}` } } },
+      scales: { x: { stacked: true, ticks: { maxTicksLimit: 12 } }, y: { stacked: true, beginAtZero: true } } }
+  });
+  status.textContent = '';
+}
+
+// Engagement theo ngày, phân theo kênh (Type: Page Owned / Group community / ...)
+let engByChannelChartInstance = null;
+function renderEngByChannelChart() {
+  const status = document.getElementById('engByChannelStatus');
+  const dates = buzzDateRangeArray();
+  const posts = getFilteredPosts();
+  const byDateByChannel = {};
+  posts.forEach(p => {
+    const ch = p.channel;
+    if (!byDateByChannel[p.date]) byDateByChannel[p.date] = {};
+    byDateByChannel[p.date][ch] = (byDateByChannel[p.date][ch] || 0) + postEngagement(p);
+  });
+  const channels = ALL_BUZZ_CHANNEL_NAMES.filter(ch => filtersT2.channels.has(ch));
+  const datasets = channels.map(ch => ({
+    label: ch, data: dates.map(d => (byDateByChannel[d] && byDateByChannel[d][ch]) || 0),
+    backgroundColor: BUZZ_CH_COLORS[ch] || '#999', stack: 'stack1',
+  }));
+  const ctx = document.getElementById('engByChannelChart');
+  if (engByChannelChartInstance) engByChannelChartInstance.destroy();
+  engByChannelChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: dates, datasets },
+    options: { responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${fmt(c.raw)}` } } },
+      scales: { x: { stacked: true, ticks: { maxTicksLimit: 12 } }, y: { stacked: true, beginAtZero: true } } }
+  });
+  status.textContent = '';
+}
+
+function rerenderT2() {
+  renderBuzzHighlight();
+  renderDummyBuzzTables();
+  renderBuzzPies();
+  renderBuzzByTypeChart();
+  renderBuzzByChannelChart();
+  renderEngByTypeChart();
+  renderEngByChannelChart();
+}
+
+// ---------- Refresh pipeline: SONG SONG + timeout + fallback riêng từng bước ----------
+// Lý do đổi từ chuỗi tuần tự (await từng bước) sang chạy song song:
+// Trước đây mọi nguồn dữ liệu (Meta, TikTok/Supermetrics, 7 query BigQuery) chạy NỐI TIẾP nhau.
+// Nếu 1 nguồn chậm/bị rate-limit (hay gặp nhất: Supermetrics TikTok), nó không chỉ làm khối đó
+// chậm mà kéo theo TOÀN BỘ các bước phía sau phải xếp hàng chờ — tổng thời gian chờ có thể lên
+// tới vài phút, khiến Traffic/Impression/Meta/Tiktok đều trông như "lỗi" dù thực chất vẫn đang tải.
+// Fix: mỗi nguồn có timeout riêng NGẮN + fallback riêng, và TẤT CẢ chạy đồng thời — tổng thời gian
+// chờ tối đa = thời gian của bước CHẬM NHẤT, không phải tổng cộng dồn của tất cả các bước.
+function withTimeout(promise, ms, label) {
+  let timer;
+  const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`Timeout "${label}" sau ${ms/1000}s`)), ms); });
+  return Promise.race([Promise.resolve(promise), timeout]).finally(() => clearTimeout(timer));
+}
+async function safeStep(label, fn, fallback, timeoutMs, onError) {
+  try {
+    return await withTimeout(fn(), timeoutMs || 15000, label);
+  } catch (e) {
+    console.error(`[refreshAll] Lỗi ở bước "${label}":`, e);
+    // QUAN TRỌNG: withTimeout không hủy được lời gọi gốc (fn() vẫn chạy nền) — nghĩa là hàm gốc
+    // (loadMetaSection/loadTiktokSection...) có thể KHÔNG BAO GIỜ tự set trạng thái lỗi lên UI vì nó
+    // vẫn đang "await" dở trong nền. Nếu không có onError ở đây, status sẽ đứng yên ở "Đang tải..."
+    // MÃI MÃI dù safeStep đã timeout từ lâu — nhìn như bị "treo/lỗi" mà không có cách nào biết hay thử lại.
+    if (onError) { try { onError(e); } catch (_) {} }
+    return fallback;
+  }
+}
+async function attemptStep(label, fn, timeoutMs) {
+  try {
+    return { ok: true, value: await withTimeout(fn(), timeoutMs || 15000, label) };
+  } catch (e) {
+    console.error(`[refreshAll] Lỗi ở bước "${label}":`, e);
+    return { ok: false };
+  }
+}
+// Chạy nhiều bước song song + TỰ ĐỘNG RETRY riêng những bước bị lỗi (không chạy lại toàn bộ) trước
+// khi chịu thua và báo cho user — đúng ý: "quét lại 1 lượt, nếu có lỗi thì tự chạy lại". Mỗi bước độc
+// lập, 1 bước lỗi/timeout không ảnh hưởng bước khác (khác Promise.all thường sẽ reject cả lô).
+// maxRetries=2 => tối đa 3 lần thử/bước (1 lần đầu + 2 lần retry) trước khi báo lỗi thật cho user.
+async function runParallel(steps, maxRetries, retryDelayMs) {
+  maxRetries = maxRetries === undefined ? 2 : maxRetries;
+  retryDelayMs = retryDelayMs === undefined ? 2500 : retryDelayMs;
+  const entries = Object.entries(steps);
+  const out = {};
+  const okMap = {};
+
+  async function runBatch(keys) {
+    const results = await Promise.all(keys.map(async (key) => {
+      const s = steps[key];
+      const r = await attemptStep(s.label || key, s.fn, s.timeoutMs);
+      return { key, r };
+    }));
+    results.forEach(({ key, r }) => {
+      okMap[key] = r.ok;
+      if (r.ok) out[key] = r.value; else out[key] = steps[key].fallback;
+    });
+  }
+
+  await runBatch(entries.map(([key]) => key));
+
+  let round = 0;
+  while (entries.some(([key]) => !okMap[key]) && round < maxRetries) {
+    round++;
+    const retryKeys = entries.map(([key]) => key).filter(key => !okMap[key]);
+    console.warn(`[refreshAll] Tự động thử lại lần ${round}/${maxRetries} cho: ${retryKeys.join(', ')}`);
+    await new Promise(r => setTimeout(r, retryDelayMs));
+    await runBatch(retryKeys);
+  }
+
+  // Chỉ báo lỗi thật cho user SAU KHI đã hết số lần tự retry — tránh nháy thông báo lỗi giả trong
+  // lúc hệ thống đang tự chữa lành ngầm (VD timeout thoáng qua tự khỏi ở lần thử thứ 2).
+  entries.forEach(([key, s]) => {
+    if (!okMap[key] && s.onError) { try { s.onError(); } catch (_) {} }
+  });
+
+  return out;
+}
+// Hiện lỗi rõ ràng + nút thử lại ngay tại chỗ bị lỗi, thay vì để status đứng yên ở "Đang tải..." mãi.
+function renderRetryError(statusElId, label) {
+  const el = document.getElementById(statusElId);
+  if (!el) return;
+  el.innerHTML = `<span class="err" style="padding:2px 6px; display:inline-block;">Lỗi/timeout khi tải ${label}. <a href="#" onclick="refreshAll(); return false;" style="color:inherit; font-weight:700; text-decoration:underline;">↻ Bấm để thử lại</a></span>`;
+}
+function showLoadingPlaceholders() {
+  // Đánh dấu rõ "đang tải" ngay từ đầu để tránh nhầm với trạng thái lỗi khi refresh còn đang chạy song song.
+  ['metaStatus','tiktokStatus','trendStatus','utmStatus','trafficTrendStatus','campaignBreakdownStatus',
+   'impressionTrendNote','impressionTrendNoteTiktok','channelStackStatus','channelStatus','sourceMediumStatus','appInstallStatus',
+   'googleAdsAppInstallStatus','campaignDauMauNote','oohFunnelStatus','oohContentLineStatus','oohRankingStatus'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = 'Đang tải...';
+  });
+  ['trafficHeadline','trafficCampaignHeadline'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = '…';
+  });
+}
+
+async function refreshAll() {
+  const btn = document.getElementById('refreshBtn');
+  btn.disabled = true; btn.textContent = 'Đang tải...';
+  renderRoadmap();
+  renderBuzzChannelFilterCheckboxes();
+  rerenderT2();
+  showLoadingPlaceholders();
+
+  // Chạy TẤT CẢ nguồn dữ liệu độc lập cùng lúc (Meta, TikTok, các query BigQuery) — xem giải thích ở trên.
+  const r = await runParallel({
+    metaData: { fn: loadMetaSection, fallback: null, timeoutMs: 20000, onError: () => renderRetryError('metaStatus', 'Meta Ads') },
+    // Riêng TikTok/Supermetrics: quan sát thực tế 19/7 cho thấy khi Supermetrics phải tự bust cache
+    // (schedule cũ bị "stalled"), riêng bước submit data_query đã mất >20s, tổng thời gian có thể
+    // chạm ~30-35s trước khi thật sự completed — timeout 20s cũ luôn bắt được TRÚNG lúc này rồi báo lỗi
+    // dù data vẫn về được, chỉ là hơi chậm. Nới lên 40s để không báo lỗi oan trong trường hợp chỉ chậm bình thường.
+    tiktokData: { fn: loadTiktokSection, fallback: null, timeoutMs: 40000, onError: () => renderRetryError('tiktokStatus', 'TikTok Ads') },
+    paidLinkData: { fn: loadPaidLinkSection, fallback: { totalBuzz: 0, totalEngagement: 0 }, timeoutMs: 15000, onError: () => renderRetryError('buzzByTypeStatus', 'Social buzz/engagement') },
+    adtimaData: { fn: loadAdtimaSection, fallback: null, timeoutMs: 15000, onError: () => renderRetryError('adtimaStatus', 'Adtima') },
+    trendData: { fn: renderTrend, fallback: { totalDau: 0, totalDwl: 0 }, timeoutMs: 12000, onError: () => renderRetryError('trendStatus', 'DAU/DWL/Lead') },
+    appInstallData: { fn: loadAppInstallData, fallback: { rows: [], total: 0 }, timeoutMs: 12000, onError: () => renderRetryError('appInstallStatus', 'App Install (Airbridge)') },
+    googleAdsAppInstall: { fn: loadGoogleAdsAppInstall, fallback: null, timeoutMs: 12000, onError: () => renderRetryError('googleAdsAppInstallStatus', 'Google Ads (App Install)') },
+    campaignDauMau: { fn: loadCampaignDauMau, fallback: null, timeoutMs: 12000, onError: () => renderRetryError('campaignDauMauNote', 'DAU/MAU theo campaign (đối chiếu)') },
+    trafficTotal: { fn: renderUTMTable, fallback: 0, timeoutMs: 12000, onError: () => renderRetryError('utmStatus', 'bảng Traffic') },
+    _trafficTrend: { fn: renderTrafficTrend, timeoutMs: 12000, onError: () => renderRetryError('trafficTrendStatus', 'Traffic theo ngày') },
+    _trafficCampaignHeadline: { fn: renderTrafficCampaignHeadline, timeoutMs: 12000 },
+    _campaignBreakdown: { fn: renderCampaignBreakdownChart, timeoutMs: 12000, onError: () => renderRetryError('campaignBreakdownStatus', 'Traffic theo Source/Medium/Content') },
+    dwlCampaign: { fn: loadCampaignDWL, fallback: 0, timeoutMs: 12000 },
+    _channelBreakdown: { fn: renderChannelBreakdown, timeoutMs: 12000, onError: () => renderRetryError('channelStatus', 'DAU/DWL theo Channel Grouping') },
+    _sourceMediumBreakdown: { fn: renderSourceMediumBreakdown, timeoutMs: 12000, onError: () => renderRetryError('sourceMediumStatus', 'DAU/DWL theo Source/Medium') },
+    _impressionTrend: { fn: renderImpressionTrend, timeoutMs: 20000, onError: () => renderRetryError('impressionTrendNote', 'Impression trend (Facebook)') },
+    // OOH Monitor (2026-08, theo Lox) — 3 bước độc lập, cùng cơ chế song song/retry/timeout như các tab khác.
+    _oohFunnel: { fn: loadOOHFunnelData, timeoutMs: 15000, onError: () => renderRetryError('oohFunnelStatus', 'OOH Funnel') },
+    _oohContentDaily: { fn: loadOOHContentDaily, fallback: [], timeoutMs: 15000, onError: () => renderRetryError('oohContentLineStatus', 'OOH theo vị trí (ngày)') },
+    _oohRanking: { fn: loadOOHRanking, timeoutMs: 15000, onError: () => renderRetryError('oohRankingStatus', 'OOH xếp hạng vị trí') },
+    // App Install contribution (Brand vs Digital, cùng 1 nguồn Airbridge) + bảng chi tiết Source/Medium/
+    // Campaign/Content — độc lập hoàn toàn (chỉ query BQ riêng), không cần chờ appInstallData/Google/Meta.
+    _installContrib: { fn: loadInstallContribution, timeoutMs: 12000, onError: () => renderRetryError('contribStatus', 'App Install contribution') },
+    _installBreakdown: { fn: loadInstallBreakdownTable, timeoutMs: 15000, onError: () => renderRetryError('installTableStatus', 'Install breakdown theo Source/Medium/Campaign/Content') },
+  });
+
+  // Các bước phụ thuộc kết quả Meta+Tiktok — chỉ chạy sau khi cả 2 đã có (thành công hoặc fallback null).
+  await safeStep('renderAwarenessHighlight', () => renderAwarenessHighlight(r.metaData, r.tiktokData), undefined, 5000);
+  const budgetData = await safeStep('loadBudget', () => loadBudget(r.metaData, r.tiktokData), { totalPlan: 0, totalActual: 0 }, 5000);
+  // Cần tiktokRawRowsCache (từ loadTiktokSection) + fbDailyRowsCache (từ renderImpressionTrend) đã sẵn sàng.
+  await safeStep('renderImpressionTrendTiktok', () => renderImpressionTrendTiktok(), undefined, 5000);
+  await safeStep('renderChannelStackedCharts', () => renderChannelStackedCharts(), undefined, 5000);
+  // App Install fetch xong độc lập với renderTrend — render lại headline DAU/DWL/Lead/App Install 1 lần
+  // nữa ở đây để gộp đủ 4 số (tránh phải đổi luồng renderTrend() giữa chừng).
+  await safeStep('renderDauHeadline(final)', () => renderDauHeadline(
+    r.trendData ? r.trendData.totalDau : 0,
+    r.trendData ? r.trendData.totalDwl : 0,
+    r.trendData ? r.trendData.totalLead : 0,
+    r.appInstallData ? r.appInstallData.total : null,
+  ), undefined, 3000);
+
+  const data = { meta: r.metaData, budget: budgetData, dwlTotal: r.trendData ? r.trendData.totalDwl : 0, dwlCampaign: r.dwlCampaign, trafficTotal: r.trafficTotal, appInstallTotal: r.appInstallData ? r.appInstallData.total : null };
+  await safeStep('renderKPIGrid', () => renderKPIGrid(data), undefined, 5000);
+  await safeStep('renderFunnel', () => renderFunnel(data), undefined, 5000);
+
+  document.getElementById('lastUpdated').textContent = new Date().toLocaleString('vi-VN');
+  btn.disabled = false; btn.textContent = '↻ Refresh data';
+}
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+    requestAnimationFrame(() => {
+      [trendChartInstance, channelChartInstance, sourceMediumChartInstance, trafficTrendChartInstance, impressionTrendChartInstance, impressionTrendChartTiktokInstance, funnelChartInstance,
+       impressionByChannelChartInstance, reachByChannelChartInstance, buzzPieChartInstance, engagementPieChartInstance, buzzByTypeChartInstance, buzzByChannelChartInstance,
+       engByTypeChartInstance, engByChannelChartInstance,
+       campaignBreakdownChartInstance, appInstallChartInstance, contribChartInstance,
+       oohFunnelChartInstance, oohContentLineChartInstance, oohContentStackChartInstance].forEach(c => { if (c) { c.resize(); c.update(); } });
+    });
+  });
+});
+
+// Filter inputs — Social buzz & Social engagement tab (client-side, tính lại ngay không cần query)
+// (checkbox kênh được tạo động + gắn listener trong renderBuzzChannelFilterCheckboxes())
+['dateFromT2','dateToT2'].forEach(id => {
+  document.getElementById(id).addEventListener('change', () => {
+    filtersT2.from = document.getElementById('dateFromT2').value || '2026-07-01';
+    filtersT2.to = document.getElementById('dateToT2').value || '2026-08-31';
+    rerenderT2();
+  });
+});
+document.getElementById('clearFiltersT2').addEventListener('click', () => {
+  document.getElementById('dateFromT2').value = '2026-07-01';
+  document.getElementById('dateToT2').value = '2026-08-31';
+  filtersT2.from = '2026-07-01'; filtersT2.to = '2026-08-31';
+  filtersT2.channels = new Set(ALL_BUZZ_CHANNEL_NAMES);
+  document.querySelectorAll('.chBuzzCh').forEach(el => el.checked = true);
+  rerenderT2();
+});
+
+// Filter inputs — Traffic tab: page/campaign/source/medium/content giờ ảnh hưởng CẢ headline, chart lẫn bảng
+let t3debounce = null;
+function bindT3Filter(id, key) {
+  document.getElementById(id).addEventListener('input', (e) => {
+    filtersT3[key] = e.target.value;
+    clearTimeout(t3debounce);
+    t3debounce = setTimeout(async () => {
+      renderUTMGrid(utmRawRows);
+      await renderTrafficTrend();
+      await renderTrafficCampaignHeadline();
+      await renderCampaignBreakdownChart();
+    }, 300);
+  });
+}
+bindT3Filter('filterPage', 'page');
+bindT3Filter('filterCampaign', 'campaign');
+bindT3Filter('filterSource', 'source');
+bindT3Filter('filterMedium', 'medium');
+bindT3Filter('filterContent', 'content');
+document.getElementById('clearFiltersT3').addEventListener('click', async () => {
+  ['filterPage','filterCampaign','filterSource','filterMedium','filterContent'].forEach(id => document.getElementById(id).value = '');
+  Object.keys(filtersT3).forEach(k => filtersT3[k] = '');
+  document.getElementById('dateFromT3').value = '2026-07-01';
+  document.getElementById('dateToT3').value = '2026-08-31';
+  trafficDateRange.from = '2026-07-01'; trafficDateRange.to = '2026-08-31';
+  await renderUTMTable(); await renderTrafficTrend(); await renderTrafficCampaignHeadline(); await renderCampaignBreakdownChart();
+});
+let t3dateDebounce = null;
+['dateFromT3','dateToT3'].forEach(id => {
+  document.getElementById(id).addEventListener('change', () => {
+    trafficDateRange.from = document.getElementById('dateFromT3').value || '2026-07-01';
+    trafficDateRange.to = document.getElementById('dateToT3').value || '2026-08-31';
+    clearTimeout(t3dateDebounce);
+    t3dateDebounce = setTimeout(async () => { await renderUTMTable(); await renderTrafficTrend(); await renderTrafficCampaignHeadline(); await renderCampaignBreakdownChart(); }, 200);
+  });
+});
+
+// Filter inputs — DAU/DWL tab (re-query BigQuery, debounce)
+// FIX 2026-07-27: thêm renderSourceMediumBreakdown() (chart mới) vào mọi chỗ đang gọi renderChannelBreakdown().
+// Riêng App Install (loadAppInstallData) không phụ thuộc filtersT4 (campaign/source/medium/content) nên chỉ
+// cần refetch khi đổi KHOẢNG NGÀY (dauDateRange), không cần refetch khi gõ filter text.
+let t4debounce = null;
+function bindT4Filter(id, key) {
+  document.getElementById(id).addEventListener('input', (e) => {
+    filtersT4[key] = e.target.value;
+    clearTimeout(t4debounce);
+    t4debounce = setTimeout(async () => { await renderTrend(); await renderChannelBreakdown(); await renderSourceMediumBreakdown(); }, 400);
+  });
+}
+bindT4Filter('filterCampaign2', 'campaign');
+bindT4Filter('filterSource2', 'source');
+bindT4Filter('filterMedium2', 'medium');
+bindT4Filter('filterContent2', 'content');
+document.getElementById('clearFiltersT4').addEventListener('click', async () => {
+  ['filterCampaign2','filterSource2','filterMedium2','filterContent2'].forEach(id => document.getElementById(id).value = '');
+  Object.keys(filtersT4).forEach(k => filtersT4[k] = '');
+  document.getElementById('dateFromT4').value = '2026-07-01';
+  document.getElementById('dateToT4').value = '2026-08-31';
+  dauDateRange.from = '2026-07-01'; dauDateRange.to = '2026-08-31';
+  const trendResult = await renderTrend();
+  await renderChannelBreakdown(); await renderSourceMediumBreakdown();
+  const appInstall = await loadAppInstallData().catch(() => ({ rows: [], total: 0 }));
+  renderDauHeadline(trendResult.totalDau, trendResult.totalDwl, trendResult.totalLead, appInstall.total);
+  await loadCampaignDauMau().catch(() => null);
+});
+let t4dateDebounce = null;
+['dateFromT4','dateToT4'].forEach(id => {
+  document.getElementById(id).addEventListener('change', () => {
+    dauDateRange.from = document.getElementById('dateFromT4').value || '2026-07-01';
+    dauDateRange.to = document.getElementById('dateToT4').value || '2026-08-31';
+    clearTimeout(t4dateDebounce);
+    t4dateDebounce = setTimeout(async () => {
+      const trendResult = await renderTrend();
+      await renderChannelBreakdown(); await renderSourceMediumBreakdown();
+      const appInstall = await loadAppInstallData().catch(() => ({ rows: [], total: 0 }));
+      renderDauHeadline(trendResult.totalDau, trendResult.totalDwl, trendResult.totalLead, appInstall.total);
+      await loadCampaignDauMau().catch(() => null);
+    }, 200);
+  });
+});
+
+document.getElementById('channelMetricToggle').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-metric]');
+  if (!btn) return;
+  document.querySelectorAll('#channelMetricToggle button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  channelMetric = btn.dataset.metric;
+  renderChannelChart();
+  renderSourceMediumChart();
+});
+
+waitForCowork().then(refreshAll).catch(e => {
+  document.getElementById('lastUpdated').textContent = 'Lỗi khởi động: ' + e.message;
+  const btn = document.getElementById('refreshBtn');
+  btn.disabled = false; btn.textContent = '↻ Refresh data';
+  renderRoadmap();
+  renderBuzzChannelFilterCheckboxes();
+  rerenderT2();
+});
+</script>
+</body>
+</html>
