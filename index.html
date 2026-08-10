@@ -2214,20 +2214,33 @@ function groupPostsByType(posts) {
 //    loại để tránh bịa kênh, ảnh hưởng không đáng kể.
 // Số Social buzz/engagement tự tính khớp 100% với công thức postBuzz()/postEngagement() ở trên (đã verify
 // chéo giữa tổng theo kênh và tổng cộng dồn từ per-post — ra đúng cùng 1 số, xem SNAPSHOT_PAID_LINK_POSTS).
+// FIX 2026-08-10 (theo Lox, "update số latest Social buzz/engagement"): đã fetch lại 100% qua export CSV
+// trực tiếp từ Sheets (cùng kỹ thuật dùng cho tab Brand keyword search), áp dụng ĐÚNG NGUYÊN VẸN quy tắc
+// lọc dòng hợp lệ cũ (Date khớp dd/mm/yyyy + Platform/Type không trống) — không đổi logic, chỉ refresh số.
+// Kết quả: 638/978 dòng hợp lệ (tăng từ 466/978 lúc chốt 07/08 — sheet có thêm data + 1 kênh MỚI "Youtube -
+// Youtube Ownned"). Đã verify chéo 2 cách tính (tự SUM Comment/Share/React/Save/Repost, và SUM trực tiếp 2
+// cột "Social buzz"/"Social engagement" có sẵn trên sheet, phải strip dấu phẩy ngăn cách nghìn trước khi
+// parse Number — nếu không sẽ undercount nặng) — khớp tuyệt đối. LƯU Ý: còn ~10 dòng có Date hợp lệ về mặt
+// nội dung nhưng KHÔNG có số 0 đệm (VD "21/7/2026" thay vì "21/07/2026") nên bị regex hiện tại loại — góp
+// thêm ~210 buzz/2.920 engagement nếu tính cả (chưa gồm trong số dưới đây, giữ đúng logic cũ để nhất quán
+// với Cowork/lịch sử — Lox xem có muốn nới regex ở CẢ 2 bản không, đây là quyết định đổi logic, không phải
+// chỉ refresh số). CHƯA refresh SNAPSHOT_PAID_LINK_POSTS (breakdown theo ngày/top posts) trong lần này —
+// chỉ 2 số tổng + bảng theo kênh theo đúng yêu cầu, xem note "v2->v3" bên dưới cho phần đó.
 const SNAPSHOT_BUZZ_CHANNEL_ROWS = [
-  { name: 'Facebook - Page Ownned', post: 25, repost: 0, comment: 2779, share: 702, react: 108045, save: 415, buzz: 3506, engagement: 111941 },
-  { name: 'Tiktok - Page Ownned', post: 6, repost: 0, comment: 60, share: 85, react: 688, save: 47, buzz: 151, engagement: 880 },
-  { name: 'Youtube - Page Ownned', post: 5, repost: 0, comment: 0, share: 0, react: 26, save: 0, buzz: 5, engagement: 26 },
+  { name: 'Facebook - Page Ownned', post: 19, repost: 0, comment: 2636, share: 669, react: 105452, save: 344, buzz: 3324, engagement: 109101 },
+  { name: 'Tiktok - Page Ownned', post: 4, repost: 0, comment: 58, share: 63, react: 650, save: 37, buzz: 125, engagement: 808 },
+  { name: 'Youtube - Page Ownned', post: 3, repost: 0, comment: 0, share: 0, react: 18, save: 0, buzz: 3, engagement: 18 },
   { name: 'Facebook - Group community', post: 6, repost: 0, comment: 508, share: 29, react: 5195, save: 0, buzz: 543, engagement: 5732 },
-  { name: 'Thread - Thead UGC', post: 154, repost: 564, comment: 4296, share: 655, react: 12442, save: 0, buzz: 5669, engagement: 17957 },
+  { name: 'Thread - Thead UGC', post: 335, repost: 762, comment: 6617, share: 1203, react: 17861, save: 0, buzz: 8917, engagement: 26443 },
   { name: 'Thread - Thread Ownned', post: 12, repost: 1, comment: 8, share: 10, react: 35, save: 0, buzz: 31, engagement: 54 },
   { name: 'Facebook - FB Cá nhân', post: 1, repost: 0, comment: 91, share: 4, react: 104, save: 0, buzz: 96, engagement: 199 },
   { name: 'Thread - Thread Seeding', post: 247, repost: 0, comment: 10, share: 20, react: 76, save: 0, buzz: 277, engagement: 106 },
-  { name: 'Tiktok - Tiktok Booking', post: 6, repost: 0, comment: 969, share: 5049, react: 22005, save: 2219, buzz: 6024, engagement: 30242 },
+  { name: 'Tiktok - Tiktok Booking', post: 6, repost: 0, comment: 1181, share: 6739, react: 30241, save: 3065, buzz: 7926, engagement: 41226 },
   { name: 'Facebook - FB Cá nhân/ TT booking reup FB', post: 2, repost: 0, comment: 91, share: 6, react: 829, save: 13, buzz: 99, engagement: 939 },
+  { name: 'Youtube - Youtube Ownned', post: 1, repost: 0, comment: 24, share: 0, react: 620, save: 0, buzz: 25, engagement: 644 },
 ];
-const SNAPSHOT_BUZZ_TOTAL = 16401;
-const SNAPSHOT_ENGAGEMENT_TOTAL = 168076;
+const SNAPSHOT_BUZZ_TOTAL = 21366;
+const SNAPSHOT_ENGAGEMENT_TOTAL = 185270;
 
 // (v2->v3) 466/978 dòng hợp lệ (thay cho 153/164 cũ) dùng để dựng 4 chart theo ngày + bảng Top posts.
 // Vẫn giữ nguyên lưu ý cũ: 1 dòng ("Mẹ chồng nàng dâu") có date gốc trên sheet là "27/7/2027" (lỗi nhập
@@ -2305,8 +2318,8 @@ function renderBuzzHighlight() {
   const pBuzz = pct(buzz, KPI_TARGETS.socialBuzz);
   const pEng = pct(eng, KPI_TARGETS.socialEngagement);
   grid.innerHTML = `
-    <div class="htile"><div class="hlabel">Social buzz <span class="badge snapshot">SNAPSHOT</span></div><div class="hvalue">${fmt(buzz)}</div><div class="htarget">Target: ${fmt(KPI_TARGETS.socialBuzz)} · chốt 07/08/2026 (100% posts sheet Paid Link)</div></div>
-    <div class="htile"><div class="hlabel">Social engagement <span class="badge snapshot">SNAPSHOT</span></div><div class="hvalue">${fmt(eng)}</div><div class="htarget">Target: ${fmt(KPI_TARGETS.socialEngagement)} · chốt 07/08/2026</div></div>
+    <div class="htile"><div class="hlabel">Social buzz <span class="badge snapshot">SNAPSHOT</span></div><div class="hvalue">${fmt(buzz)}</div><div class="htarget">Target: ${fmt(KPI_TARGETS.socialBuzz)} · chốt 10/08/2026 (breakdown theo kênh, xem note code)</div></div>
+    <div class="htile"><div class="hlabel">Social engagement <span class="badge snapshot">SNAPSHOT</span></div><div class="hvalue">${fmt(eng)}</div><div class="htarget">Target: ${fmt(KPI_TARGETS.socialEngagement)} · chốt 10/08/2026</div></div>
   `;
 }
 
