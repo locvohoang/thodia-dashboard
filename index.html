@@ -253,6 +253,7 @@
       <button class="tab-btn" data-tab="t3">Traffic</button>
       <button class="tab-btn" data-tab="t4">DAU/App install &amp; DWL</button>
       <button class="tab-btn" data-tab="t5">OOH Monitor</button>
+      <button class="tab-btn" data-tab="t6">Brand keyword search</button>
     </div>
 
     <div class="tab-panel active card" id="t1">
@@ -476,6 +477,29 @@
       <div class="subhead">Xếp hạng theo vị trí OOH (utm_content) — từ 22/7</div>
       <table class="simple" id="oohRankingTable"></table>
       <div class="status-line" id="oohRankingStatus"></div>
+    </div>
+
+    <div class="tab-panel card" id="t6">
+      <div class="err" style="background:var(--blue-bg); color:var(--ink); border-left:3px solid var(--blue); margin-bottom:14px;">
+        <b>Brand keyword search</b> (Google Search Console, nhatot.com) — impression/click từ các từ khóa chứa biến thể "nhà tốt"/"nhatot" hoặc "chợ tốt" (đã bỏ dấu, cho phép khoảng trắng linh hoạt), khoảng 01/04–10/08/2026. Metric tìm kiếm thương hiệu <b>độc lập</b>, không thuộc Success Metrics của campaign OOH. Lưu ý: "chợ tốt" match rộng — impression của từ khóa này có thể lẫn tìm kiếm chung nhóm Chợ Tốt, không chỉ riêng brand Nhà Tốt, nên CTR breakdown theo từ khóa "chợ tốt" thấp hơn hẳn "nhà tốt"/"nhatot" — đây là bản chất data, không phải lỗi. Đã loại dòng trùng lặp ở bảng nguồn (lỗi ETL, ~23% dòng) trước khi tính SUM. <b>SNAPSHOT TĨNH</b> — chốt số lúc 10/08/2026, khác thời điểm snapshot 07/08/2026 của các tab khác trong trang này (chỉ tab này được đồng bộ theo yêu cầu Lox lần này).
+      </div>
+
+      <div class="highlight-grid" id="brandSearchHighlight" style="grid-template-columns: repeat(4, 1fr); max-width:900px;"></div>
+      <div class="status-line" id="brandSearchStatus"></div>
+
+      <div class="highlight-grid cols-2" id="brandSearchPeriodCompare" style="max-width:520px;"></div>
+      <div class="status-line" id="brandSearchPeriodCompareStatus"></div>
+
+      <div class="subhead">Impression &amp; Click theo ngày</div>
+      <div class="status-line" style="margin-bottom:6px;">Impression (cột, trục trái) và Click (line, trục phải) — theo dõi tương quan: Impression giảm nhưng Click tăng/giữ nguyên thường là dấu hiệu campaign hiệu quả hơn.</div>
+      <div class="chart-box tall"><canvas id="brandSearchTrendChart"></canvas></div>
+
+      <div class="subhead">Breakdown theo từ khóa (top 20 theo Click)</div>
+      <table class="simple" id="brandSearchTable">
+        <thead><tr><th>Query</th><th class="num">Click</th><th class="num">Impression</th><th class="num">CTR</th></tr></thead>
+        <tbody><tr><td colspan="4">—</td></tr></tbody>
+      </table>
+      <div class="status-line" id="brandSearchTableStatus"></div>
     </div>
   </div>
 
@@ -2604,6 +2628,94 @@ function showLoadingPlaceholders() {
     if (el) el.textContent = '…';
   });
 }
+
+
+// ---------- Brand keyword search (Google Search Console, nhatot.com) — SNAPSHOT TĨNH, chốt 10/08/2026 ----------
+// Đồng bộ tab mới từ bản Cowork (thêm 2026-08-10) sang GitHub Pages theo yêu cầu Lox — CHỈ đồng bộ phần
+// này, các tab khác vẫn giữ nguyên snapshot chốt 07/08/2026 (SNAPSHOT_FROZEN_AT) như trước, không refetch.
+// Dữ liệu fetch 1 lần từ chotot-dwh.chotot_data.google_search_keyword (đã loại dòng trùng lặp -- lỗi ETL,
+// ~23% dòng -- trước khi SUM, xem note trong bản Cowork) rồi đóng băng thành hằng số tĩnh, y hệt cách các
+// tab khác trong file này đang làm.
+const BRAND_SEARCH_SNAPSHOT_AT = '10/08/2026 (giờ VN)';
+const BRAND_SEARCH_SUMMARY = { clicks: 109007, impressions: 1876684, ctr: 0.058084898682996176, avgPosition: 3.9572805011392433 };
+const BRAND_SEARCH_TREND = [["2026-04-01",860,20320],["2026-04-02",876,18754],["2026-04-03",777,19288],["2026-04-04",788,18083],["2026-04-05",910,20542],["2026-04-06",915,21967],["2026-04-07",927,22295],["2026-04-08",806,19778],["2026-04-09",795,17094],["2026-04-10",777,16379],["2026-04-11",721,13410],["2026-04-12",795,16405],["2026-04-13",920,16732],["2026-04-14",858,15580],["2026-04-15",800,14209],["2026-04-16",891,11728],["2026-04-17",766,11158],["2026-04-18",780,12244],["2026-04-19",873,12475],["2026-04-20",875,13186],["2026-04-21",803,12962],["2026-04-22",759,14170],["2026-04-25",644,9998],["2026-04-26",698,11899],["2026-04-27",746,13301],["2026-04-28",742,12806],["2026-04-29",601,11130],["2026-04-30",607,10367],["2026-05-01",682,10971],["2026-05-02",789,15381],["2026-05-03",919,13603],["2026-05-04",973,15686],["2026-05-05",882,17117],["2026-05-06",853,16675],["2026-05-07",916,15024],["2026-05-08",810,15657],["2026-05-09",776,15848],["2026-05-10",914,17144],["2026-05-11",867,17499],["2026-05-12",888,16921],["2026-05-13",963,17760],["2026-05-14",900,16059],["2026-05-15",784,13992],["2026-05-16",843,13869],["2026-05-17",932,16635],["2026-05-18",946,18050],["2026-05-19",946,18403],["2026-05-20",953,17460],["2026-05-21",887,17270],["2026-05-22",782,15703],["2026-05-23",718,16617],["2026-05-24",854,13974],["2026-05-25",909,18515],["2026-05-26",927,17429],["2026-05-27",941,16293],["2026-05-28",875,14530],["2026-05-29",717,14694],["2026-05-30",748,14844],["2026-05-31",856,15655],["2026-06-01",866,16058],["2026-06-05",796,14791],["2026-06-06",796,12509],["2026-06-07",873,13751],["2026-06-08",854,15079],["2026-06-09",813,13391],["2026-06-10",846,14609],["2026-06-11",825,15881],["2026-06-12",831,17898],["2026-06-13",813,17711],["2026-06-14",860,16786],["2026-06-15",903,18005],["2026-06-16",883,18730],["2026-06-17",924,19962],["2026-06-18",858,17510],["2026-06-19",797,18334],["2026-06-20",802,19685],["2026-06-21",901,21806],["2026-06-22",919,21044],["2026-06-23",1006,20851],["2026-06-24",928,16927],["2026-06-25",856,14940],["2026-06-26",820,15435],["2026-06-27",787,14720],["2026-06-28",911,18227],["2026-06-29",930,18678],["2026-06-30",911,14786],["2026-07-01",886,16104],["2026-07-02",871,14435],["2026-07-03",821,13175],["2026-07-04",795,12901],["2026-07-05",973,14728],["2026-07-06",914,14563],["2026-07-07",925,14392],["2026-07-08",896,13081],["2026-07-09",905,13939],["2026-07-10",911,13057],["2026-07-11",716,11117],["2026-07-12",958,12949],["2026-07-13",1018,13365],["2026-07-14",973,13935],["2026-07-15",916,12729],["2026-07-16",874,15447],["2026-07-17",858,13061],["2026-07-18",844,10776],["2026-07-19",948,11533],["2026-07-20",1108,12205],["2026-07-21",1164,12196],["2026-07-22",1108,14399],["2026-07-23",1078,14267],["2026-07-24",1025,12350],["2026-07-25",948,10969],["2026-07-26",1117,11060],["2026-07-27",1079,12138],["2026-07-28",1139,11839],["2026-07-29",1004,11613],["2026-07-30",1002,11213],["2026-07-31",862,9934],["2026-08-01",875,9380],["2026-08-02",1092,10297],["2026-08-03",1104,13344],["2026-08-04",1102,13699],["2026-08-05",967,14859],["2026-08-06",987,18569],["2026-08-07",875,15424]].map(r => ({ date: r[0], clicks: r[1], impressions: r[2] }));
+const BRAND_SEARCH_TOP_QUERIES = [["nhà tốt",38948,277459,0.14037389307969828],["nhatot",33255,236335,0.14071127848181605],["nha tot",7270,48686,0.1493242410549234],["chợ tốt",2441,707937,0.003448046930729712],["chợ tốt thuê nhà",1856,18192,0.10202286719437115],["nhatot.vn",1805,12085,0.14935870914356641],["chợ tốt nhà",896,13285,0.0674444862627023],["nhà tốt tphcm",755,4993,0.1512116963749249],["nhatot tphcm",683,4272,0.15987827715355804],["nhà tốt đà nẵng",674,3342,0.20167564332734889],["nhàtot",579,4176,0.13864942528735633],["nhà tot",579,4155,0.13935018050541517],["nha tốt",503,3436,0.14639115250291035],["nhatot thuê trọ",485,3478,0.13944795859689477],["nhà tôt",421,3076,0.1368660598179454],["nhà tốt.com",415,3099,0.13391416585995483],["chợ tốt phòng trọ",408,2092,0.1950286806883365],["nhatot.com",390,3391,0.11501032143910352],["phòng trọ chợ tốt",383,1551,0.24693745970341716],["chợ tốt nhà tphcm",364,4866,0.07480476777640772]].map(r => ({ query: r[0], clicks: r[1], impressions: r[2], ctr: r[3] }));
+const BRAND_SEARCH_PERIOD_COMPARE = {
+  currentStart: '2026-07-01', currentEnd: '2026-08-10', durationDays: 41,
+  prevStart: '2026-05-21', prevEnd: '2026-06-30',
+  current: { clicks: 36638, impressions: 495042 }, previous: { clicks: 32523, impressions: 633628 },
+};
+function renderBrandSearchStatic() {
+  const grid = document.getElementById('brandSearchHighlight');
+  if (grid) {
+    const s = BRAND_SEARCH_SUMMARY;
+    const tiles = [
+      { label: 'Total Click', value: fmt(s.clicks) },
+      { label: 'Total Impression', value: fmt(s.impressions) },
+      { label: 'Site CTR', value: fmt2(s.ctr * 100) + '%' },
+      { label: 'Avg. Position', value: fmt2(s.avgPosition) },
+    ];
+    grid.innerHTML = tiles.map(t => `<div class="htile"><div class="hlabel">${t.label} <span class="badge snapshot">SNAPSHOT</span></div><div class="hvalue">${t.value}</div></div>`).join('');
+  }
+  const status = document.getElementById('brandSearchStatus');
+  if (status) status.textContent = `SNAPSHOT (chốt ${BRAND_SEARCH_SNAPSHOT_AT}) · 01/04–10/08/2026 · nguồn chotot-dwh.chotot_data.google_search_keyword`;
+
+  const cmpGrid = document.getElementById('brandSearchPeriodCompare');
+  if (cmpGrid) {
+    const p = BRAND_SEARCH_PERIOD_COMPARE;
+    function tile(label, curVal, prevVal) {
+      const delta = prevVal ? ((curVal - prevVal) / prevVal * 100) : null;
+      const up = delta !== null && delta >= 0;
+      const color = delta === null ? 'var(--ink-soft)' : (up ? 'var(--green)' : 'var(--red)');
+      const arrow = delta === null ? '' : (up ? '▲' : '▼');
+      return `<div class="htile"><div class="hlabel">${label} vs kỳ trước <span class="badge snapshot">SNAPSHOT</span></div>
+        <div class="hvalue" style="color:${color};">${arrow} ${delta !== null ? fmt2(Math.abs(delta)) + '%' : '—'}</div>
+        <div class="htarget">${fmt(curVal)} (kỳ này) vs ${fmt(prevVal)} (kỳ trước)</div></div>`;
+    }
+    cmpGrid.innerHTML = tile('Click', p.current.clicks, p.previous.clicks) + tile('Impression', p.current.impressions, p.previous.impressions);
+  }
+  const cmpStatus = document.getElementById('brandSearchPeriodCompareStatus');
+  if (cmpStatus) {
+    const p = BRAND_SEARCH_PERIOD_COMPARE;
+    const f = (d) => d.split('-').reverse().join('/');
+    cmpStatus.textContent = `Kỳ này: ${f(p.currentStart)}–${f(p.currentEnd)} (${p.durationDays} ngày) · Kỳ trước: ${f(p.prevStart)}–${f(p.prevEnd)}`;
+  }
+
+  const ctx = document.getElementById('brandSearchTrendChart');
+  if (ctx) {
+    const labels = BRAND_SEARCH_TREND.map(r => r.date);
+    const impressions = BRAND_SEARCH_TREND.map(r => r.impressions);
+    const clicks = BRAND_SEARCH_TREND.map(r => r.clicks);
+    new Chart(ctx, {
+      data: {
+        labels,
+        datasets: [
+          { type: 'bar', label: 'Impression', data: impressions, backgroundColor: 'rgba(245,129,31,0.55)', yAxisID: 'y', order: 2 },
+          { type: 'line', label: 'Click', data: clicks, borderColor: '#2563AA', backgroundColor: 'transparent', borderWidth: 2.5, tension: 0.15, pointRadius: 0, yAxisID: 'y1', order: 1 },
+        ],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${fmt(c.raw)}` } } },
+        scales: {
+          x: { ticks: { maxTicksLimit: 12 } },
+          y: { type: 'linear', position: 'left', beginAtZero: true, title: { display: true, text: 'Impression' }, ticks: { callback: (v) => fmt(v) } },
+          y1: { type: 'linear', position: 'right', beginAtZero: true, title: { display: true, text: 'Click' }, grid: { drawOnChartArea: false }, ticks: { callback: (v) => fmt(v) } },
+        },
+      },
+    });
+  }
+
+  const table = document.getElementById('brandSearchTable');
+  if (table) {
+    const rowsHtml = BRAND_SEARCH_TOP_QUERIES.map(r => `<tr><td>${r.query}</td><td class="num">${fmt(r.clicks)}</td><td class="num">${fmt(r.impressions)}</td><td class="num">${fmt2(r.ctr * 100)}%</td></tr>`).join('');
+    table.innerHTML = `<thead><tr><th>Query</th><th class="num">Click</th><th class="num">Impression</th><th class="num">CTR</th></tr></thead><tbody>${rowsHtml}</tbody>`;
+  }
+  const tableStatus = document.getElementById('brandSearchTableStatus');
+  if (tableStatus) tableStatus.textContent = `Top 20 query theo Click (SNAPSHOT, chốt ${BRAND_SEARCH_SNAPSHOT_AT})`;
+}
+renderBrandSearchStatic();
 
 async function refreshAll() {
   const btn = document.getElementById('refreshBtn');
